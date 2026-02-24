@@ -39,7 +39,7 @@ export const registerSchema = z
       .string()
       .min(1, 'Confirmação de senha é obrigatória'),
     role: z.enum(['patient', 'professional'], {
-      required_error: 'Selecione o tipo de conta',
+      message: 'Selecione o tipo de conta',
     }),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -57,7 +57,7 @@ export const professionalProfileSchema = z.object({
     .min(1, 'Nome de exibição é obrigatório')
     .max(120, 'Nome deve ter no máximo 120 caracteres'),
   registrationType: z.enum(REGISTRATION_TYPES as unknown as [string, ...string[]], {
-    required_error: 'Tipo de registro é obrigatório',
+    message: 'Tipo de registro é obrigatório',
   }),
   registrationNumber: z
     .string()
@@ -193,7 +193,7 @@ export const appointmentSchema = z.object({
     .min(1, 'Horário de término é obrigatório')
     .regex(/^\d{2}:\d{2}$/, 'Horário deve estar no formato HH:mm'),
   type: z.enum(['in_person', 'telemedicine'], {
-    required_error: 'Tipo de consulta é obrigatório',
+    message: 'Tipo de consulta é obrigatório',
   }),
   reason: z
     .string()
@@ -307,10 +307,10 @@ export const taskSchema = z.object({
     .optional()
     .or(z.literal('')),
   priority: z.enum(['low', 'medium', 'high'], {
-    required_error: 'Prioridade é obrigatória',
+    message: 'Prioridade é obrigatória',
   }).default('medium'),
   status: z.enum(['pending', 'in_progress', 'completed', 'cancelled'], {
-    required_error: 'Status é obrigatório',
+    message: 'Status é obrigatório',
   }).default('pending'),
   assigneeId: z
     .string()
