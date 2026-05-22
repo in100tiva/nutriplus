@@ -1,0 +1,3 @@
+# Managed by @luanpdd/kit-mcp — this directory is overwritten on every `kit sync install`.
+# Do not edit files here directly; edit the canonical source under kit/ and re-run sync.
+# Removing this file disables `kit sync remove` cleanup of this tree.

@@ -1,146 +1,111 @@
-import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom'
+import { createBrowserRouter, Navigate, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/use-auth'
-import { Loading } from '@/components/ui/loading'
-import { AuthLayout } from '@/components/layout/auth-layout'
-import { DashboardShell } from '@/components/layout/dashboard-shell'
-import { PublicLayout } from '@/components/layout/public-layout'
-
-// Auth
+import { Loading } from '@/components/ui'
+import { AuthLayout, DashboardShell } from '@/components/layout'
+import { LandingPage } from '@/features/marketing/landing-page'
 import { LoginPage } from '@/features/auth/login-page'
-import { RegisterPage } from '@/features/auth/register-page'
-import { ForgotPasswordPage } from '@/features/auth/forgot-password-page'
-
-// Onboarding
-import { ProfessionalOnboarding } from '@/features/onboarding/professional-onboarding'
-import { PatientOnboarding } from '@/features/onboarding/patient-onboarding'
-
-// Dashboards
-import { ProfessionalDashboard } from '@/features/dashboard/professional-dashboard'
-import { PatientDashboard } from '@/features/dashboard/patient-dashboard'
-
-// Professional features
-import PatientsPage from '@/features/patients/patients-page'
-import PatientDetailPage from '@/features/patients/patient-detail-page'
-import AppointmentsPage from '@/features/appointments/appointments-page'
-import ClinicalRecordsPage from '@/features/clinical-records/clinical-records-page'
-import RecordEditor from '@/features/clinical-records/record-editor'
-import FormsPage from '@/features/forms/forms-page'
-import TasksPage from '@/features/tasks/tasks-page'
-import NewTaskForm from '@/features/tasks/new-task-form'
-import ReviewsPage from '@/features/reviews/reviews-page'
-import { OrganizationPage } from '@/features/organization/organization-page'
-
-// Patient features
-import { MarketplacePage } from '@/features/marketplace/marketplace-page'
-import { ProfessionalPublicProfile } from '@/features/marketplace/professional-public-profile'
-import { BookingFlow } from '@/features/marketplace/booking-flow'
-import { MyAppointmentsPage } from '@/features/appointments/my-appointments-page'
-import { MyTasksPage } from '@/features/tasks/my-tasks-page'
-
-// Shared features
-import { MessagesPage } from '@/features/messages/messages-page'
-import { DocumentsPage } from '@/features/documents/documents-page'
-import { BillingPage } from '@/features/billing/billing-page'
-import { SettingsPage } from '@/features/settings/settings-page'
-
-// Placeholder for routes not yet built
-import { PlaceholderPage } from '@/features/placeholder-page'
-
-// ─── ProtectedRoute ─────────────────────────────────────────────
+import { CadastroPage } from '@/features/auth/cadastro-page'
+import { NutriDashboard } from '@/features/app/dashboard-nutri'
+import { PerfilNutriPage } from '@/features/app/perfil-page'
+import { AgendaPage } from '@/features/app/agenda-page'
+import { PacientesPage } from '@/features/app/pacientes-page'
+import { PacienteDetalhePage } from '@/features/app/paciente-detalhe-page'
+import { PlanosPage } from '@/features/app/planos-page'
+import { PlanoEditorPage } from '@/features/app/plano-editor-page'
+import { ConsultaPage } from '@/features/app/consulta-page'
+import { PacienteAgendamentosPage } from '@/features/paciente/agendamentos-page'
+import { PacientePlanoPage } from '@/features/paciente/plano-page'
+import { PacienteEvolucaoPage } from '@/features/paciente/evolucao-page'
+import { NutriPublicPage } from '@/features/publico/nutri-public-page'
+import { AdminSaudePage } from '@/features/admin/saude-page'
 
 function ProtectedRoute() {
-  const { user, loading, initialized } = useAuth()
-
-  if (!initialized || loading) {
-    return <Loading label="Carregando..." />
-  }
-
-  if (!user) {
-    return <Navigate to="/login" replace />
-  }
-
+  const { session, initialized } = useAuth()
+  if (!initialized) return <Loading label="Carregando..." />
+  if (!session) return <Navigate to="/login" replace />
   return <Outlet />
 }
-
-// ─── AuthRedirect (already logged in -> redirect) ───────────────
 
 function AuthRedirect() {
-  const { user, loading, initialized } = useAuth()
-
-  if (!initialized || loading) {
-    return <Loading label="Carregando..." />
+  const { session, initialized, profile } = useAuth()
+  if (!initialized) return <Loading label="Carregando..." />
+  if (session) {
+    if (profile?.role === 'nutricionista') return <Navigate to="/app" replace />
+    if (profile?.role === 'admin') return <Navigate to="/admin/saude" replace />
+    return <Navigate to="/paciente/agendamentos" replace />
   }
-
-  if (user) {
-    return <Navigate to="/" replace />
-  }
-
   return <Outlet />
 }
 
-// ─── Root Redirect ──────────────────────────────────────────────
-
-function RootRedirect() {
-  const { user, profile, loading, initialized } = useAuth()
-
-  if (!initialized || loading) {
-    return <Loading label="Carregando..." />
+function RoleGate({ allow }: { allow: Array<'nutricionista' | 'paciente' | 'admin'> }) {
+  const { profile, initialized } = useAuth()
+  if (!initialized) return <Loading label="Carregando..." />
+  if (!profile) return <Navigate to="/login" replace />
+  if (!allow.includes(profile.role)) {
+    const fallback =
+      profile.role === 'nutricionista'
+        ? '/app'
+        : profile.role === 'admin'
+          ? '/admin/saude'
+          : '/paciente/agendamentos'
+    return <Navigate to={fallback} replace />
   }
-
-  if (!user) {
-    return <Navigate to="/login" replace />
-  }
-
-  if (profile?.role === 'professional') {
-    return <Navigate to="/pro" replace />
-  }
-
-  return <Navigate to="/app" replace />
+  return <Outlet />
 }
 
-// ─── Professional Layout Wrapper ─────────────────────────────────
-
-function ProfessionalLayout() {
+function NutriShell() {
   const { profile, signOut } = useAuth()
-
+  const navigate = useNavigate()
   return (
     <DashboardShell
-      role="professional"
-      user={{
-        name: profile?.full_name ?? 'Profissional',
-        avatarUrl: profile?.avatar_url ?? undefined,
-        role: 'Profissional',
+      role="nutricionista"
+      user={{ name: profile?.nome ?? 'Nutricionista', role: 'Nutricionista', avatarUrl: profile?.avatar_url ?? undefined }}
+      perfilHref="/app/perfil"
+      onSignOut={async () => {
+        await signOut()
+        navigate('/login')
       }}
-      onSignOut={signOut}
     >
       <Outlet />
     </DashboardShell>
   )
 }
 
-// ─── Patient Layout Wrapper ──────────────────────────────────────
-
-function PatientLayout() {
+function PacienteShell() {
   const { profile, signOut } = useAuth()
-
+  const navigate = useNavigate()
   return (
     <DashboardShell
-      role="patient"
-      user={{
-        name: profile?.full_name ?? 'Paciente',
-        avatarUrl: profile?.avatar_url ?? undefined,
-        role: 'Paciente',
+      role="paciente"
+      user={{ name: profile?.nome ?? 'Paciente', role: 'Paciente', avatarUrl: profile?.avatar_url ?? undefined }}
+      onSignOut={async () => {
+        await signOut()
+        navigate('/login')
       }}
-      onSignOut={signOut}
     >
       <Outlet />
     </DashboardShell>
   )
 }
 
-// ─── Auth Layout Wrapper ─────────────────────────────────────────
+function AdminShell() {
+  const { profile, signOut } = useAuth()
+  const navigate = useNavigate()
+  return (
+    <DashboardShell
+      role="admin"
+      user={{ name: profile?.nome ?? 'Admin', role: 'Admin', avatarUrl: profile?.avatar_url ?? undefined }}
+      onSignOut={async () => {
+        await signOut()
+        navigate('/login')
+      }}
+    >
+      <Outlet />
+    </DashboardShell>
+  )
+}
 
-function AuthLayoutWrapper() {
+function AuthShell() {
   return (
     <AuthLayout>
       <Outlet />
@@ -148,122 +113,74 @@ function AuthLayoutWrapper() {
   )
 }
 
-// ─── Public Layout Wrapper ───────────────────────────────────────
-
-function PublicLayoutWrapper() {
-  return (
-    <PublicLayout>
-      <Outlet />
-    </PublicLayout>
-  )
-}
-
-// ─── Router ──────────────────────────────────────────────────────
-
 export const router = createBrowserRouter([
-  // Root redirect
-  {
-    path: '/',
-    element: <RootRedirect />,
-  },
+  // Públicas
+  { path: '/', element: <LandingPage /> },
+  { path: '/nutri/:slug', element: <NutriPublicPage /> },
 
-  // Auth routes (redirect if already logged in)
+  // Auth (somente se NÃO logado)
   {
     element: <AuthRedirect />,
     children: [
       {
-        element: <AuthLayoutWrapper />,
+        element: <AuthShell />,
         children: [
           { path: '/login', element: <LoginPage /> },
-          { path: '/register', element: <RegisterPage /> },
-          { path: '/forgot-password', element: <ForgotPasswordPage /> },
+          { path: '/cadastro', element: <CadastroPage /> },
         ],
       },
     ],
   },
 
-  // Onboarding routes (protected)
-  {
-    element: <ProtectedRoute />,
-    children: [
-      { path: '/onboarding/professional', element: <ProfessionalOnboarding /> },
-      { path: '/onboarding/patient', element: <PatientOnboarding /> },
-    ],
-  },
-
-  // Professional routes
+  // Área do nutricionista
   {
     element: <ProtectedRoute />,
     children: [
       {
-        element: <ProfessionalLayout />,
+        element: <RoleGate allow={['nutricionista']} />,
         children: [
-          { path: '/pro', element: <ProfessionalDashboard /> },
-          { path: '/pro/patients', element: <PatientsPage /> },
-          { path: '/pro/patients/:id', element: <PatientDetailPage /> },
-          { path: '/pro/appointments', element: <AppointmentsPage /> },
           {
-            path: '/pro/appointments/:id',
-            element: (
-              <PlaceholderPage
-                title="Detalhes da Consulta"
-                description="Visualize informações da consulta, notas clínicas e documentos relacionados."
-              />
-            ),
+            element: <NutriShell />,
+            children: [
+              { path: '/app', element: <NutriDashboard /> },
+              { path: '/app/agenda', element: <AgendaPage /> },
+              { path: '/app/pacientes', element: <PacientesPage /> },
+              { path: '/app/pacientes/:id', element: <PacienteDetalhePage /> },
+              { path: '/app/planos', element: <PlanosPage /> },
+              { path: '/app/planos/:id', element: <PlanoEditorPage /> },
+              { path: '/app/consulta/:id', element: <ConsultaPage perspectiva="nutricionista" /> },
+              { path: '/app/perfil', element: <PerfilNutriPage /> },
+            ],
           },
-          { path: '/pro/records', element: <ClinicalRecordsPage /> },
-          { path: '/pro/records/new', element: <RecordEditor /> },
-          { path: '/pro/forms', element: <FormsPage /> },
-          { path: '/pro/tasks', element: <TasksPage /> },
-          { path: '/pro/tasks/new', element: <NewTaskForm /> },
-          { path: '/pro/messages', element: <MessagesPage /> },
-          { path: '/pro/messages/:conversationId', element: <MessagesPage /> },
-          { path: '/pro/documents', element: <DocumentsPage /> },
-          { path: '/pro/reviews', element: <ReviewsPage /> },
-          { path: '/pro/organization', element: <OrganizationPage /> },
-          { path: '/pro/settings', element: <SettingsPage /> },
-          { path: '/pro/billing', element: <BillingPage /> },
         ],
       },
-    ],
-  },
 
-  // Patient routes
-  {
-    element: <ProtectedRoute />,
-    children: [
+      // Área do paciente
       {
-        element: <PatientLayout />,
+        element: <RoleGate allow={['paciente']} />,
         children: [
-          { path: '/app', element: <PatientDashboard /> },
-          { path: '/app/search', element: <MarketplacePage /> },
-          { path: '/app/professional/:id', element: <ProfessionalPublicProfile /> },
-          { path: '/app/booking/:professionalId', element: <BookingFlow /> },
-          { path: '/app/appointments', element: <MyAppointmentsPage /> },
           {
-            path: '/app/records',
-            element: (
-              <PlaceholderPage
-                title="Meus Prontuários"
-                description="Acesse seus prontuários e registros clínicos compartilhados pelos profissionais."
-              />
-            ),
+            element: <PacienteShell />,
+            children: [
+              { path: '/paciente/agendamentos', element: <PacienteAgendamentosPage /> },
+              { path: '/paciente/plano', element: <PacientePlanoPage /> },
+              { path: '/paciente/evolucao', element: <PacienteEvolucaoPage /> },
+              { path: '/paciente/consulta/:id', element: <ConsultaPage perspectiva="paciente" /> },
+            ],
           },
-          { path: '/app/tasks', element: <MyTasksPage /> },
-          { path: '/app/messages', element: <MessagesPage /> },
-          { path: '/app/documents', element: <DocumentsPage /> },
-          { path: '/app/settings', element: <SettingsPage /> },
         ],
       },
-    ],
-  },
 
-  // Public routes
-  {
-    element: <PublicLayoutWrapper />,
-    children: [
-      { path: '/search', element: <MarketplacePage /> },
-      { path: '/professional/:id', element: <ProfessionalPublicProfile /> },
+      // Área admin
+      {
+        element: <RoleGate allow={['admin']} />,
+        children: [
+          {
+            element: <AdminShell />,
+            children: [{ path: '/admin/saude', element: <AdminSaudePage /> }],
+          },
+        ],
+      },
     ],
   },
 ])

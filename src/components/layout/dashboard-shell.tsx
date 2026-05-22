@@ -3,8 +3,6 @@ import { cn } from '@/lib/utils'
 import { Sidebar } from './sidebar'
 import { Header } from './header'
 
-// ─── Types ──────────────────────────────────────────────────────
-
 interface DashboardUser {
   name: string
   avatarUrl?: string
@@ -12,108 +10,82 @@ interface DashboardUser {
 }
 
 export interface DashboardShellProps {
-  role: 'professional' | 'patient'
+  role: 'nutricionista' | 'paciente' | 'admin'
   user: DashboardUser
   title?: string
-  notificationCount?: number
+  perfilHref?: string
   onSignOut?: () => void
   children: React.ReactNode
 }
-
-// ─── Component ──────────────────────────────────────────────────
 
 export function DashboardShell({
   role,
   user,
   title,
-  notificationCount = 0,
+  perfilHref,
   onSignOut,
   children,
 }: DashboardShellProps) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  // Close mobile sidebar on route change / escape key
   useEffect(() => {
-    function handleEscape(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        setMobileOpen(false)
-      }
+    function onEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMobileOpen(false)
     }
-
     if (mobileOpen) {
-      document.addEventListener('keydown', handleEscape)
-      // Prevent body scroll when mobile sidebar is open
+      document.addEventListener('keydown', onEscape)
       document.body.style.overflow = 'hidden'
     } else {
       document.body.style.overflow = ''
     }
-
     return () => {
-      document.removeEventListener('keydown', handleEscape)
+      document.removeEventListener('keydown', onEscape)
       document.body.style.overflow = ''
     }
   }, [mobileOpen])
 
-  const handleMenuToggle = useCallback(() => {
-    setMobileOpen((prev) => !prev)
-  }, [])
-
-  const handleMobileClose = useCallback(() => {
-    setMobileOpen(false)
-  }, [])
+  const toggleMobile = useCallback(() => setMobileOpen((p) => !p), [])
+  const closeMobile = useCallback(() => setMobileOpen(false), [])
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
-      {/* Mobile overlay */}
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity lg:hidden"
-          onClick={handleMobileClose}
+          onClick={closeMobile}
           aria-hidden="true"
         />
       )}
 
-      {/* Mobile sidebar */}
       <div
         className={cn(
           'fixed inset-y-0 left-0 z-50 transition-transform duration-300 ease-in-out lg:hidden',
-          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+          mobileOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <Sidebar
-          role={role}
-          user={user}
-          collapsed={false}
-          onSignOut={onSignOut}
-        />
+        <Sidebar role={role} user={user} collapsed={false} onSignOut={onSignOut} />
       </div>
 
-      {/* Desktop sidebar */}
       <div className="hidden lg:block">
         <Sidebar
           role={role}
           user={user}
-          collapsed={sidebarCollapsed}
-          onCollapsedChange={setSidebarCollapsed}
+          collapsed={collapsed}
+          onCollapsedChange={setCollapsed}
           onSignOut={onSignOut}
         />
       </div>
 
-      {/* Main content area */}
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header
           title={title}
           user={user}
-          notificationCount={notificationCount}
-          onMenuToggle={handleMenuToggle}
+          perfilHref={perfilHref}
+          onMenuToggle={toggleMobile}
           onSignOut={onSignOut}
         />
-
-        {/* Scrollable content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-          {children}
-        </main>
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
       </div>
     </div>
   )
