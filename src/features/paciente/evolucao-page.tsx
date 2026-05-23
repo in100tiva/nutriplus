@@ -1,18 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
-import { LineChart as LineIcon } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/use-auth'
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Loading,
-  EmptyState,
-} from '@/components/ui'
+import { Card, CardHeader, CardTitle, CardContent, Loading, EmptyState } from '@/components/ui'
+import { LineChart } from '@/components/charts'
+import { IconChart } from '@/components/icons'
 import { formatData } from '@/lib/format'
 
-type Aval = {
+interface Aval {
   id: string
   data: string
   peso_kg: number | null
@@ -28,8 +22,6 @@ export function PacienteEvolucaoPage() {
     queryKey: ['paciente-evolucao', profile?.id],
     enabled: !!profile?.id,
     queryFn: async () => {
-      // RLS já filtra pelo paciente_profile_id; basta listar avaliações
-      // de prontuários onde ele é o paciente.
       const { data: pron } = await supabase
         .from('prontuarios')
         .select('id')
@@ -46,45 +38,114 @@ export function PacienteEvolucaoPage() {
     },
   })
 
-  if (isLoading) return <Loading label="Carregando..." />
+  if (isLoading) return <Loading label="Carregando…" />
   if (!data || data.length === 0) {
     return (
       <EmptyState
-        icon={<LineIcon className="h-5 w-5" />}
+        icon={<IconChart />}
         title="Sem avaliações"
         description="Quando seu nutricionista registrar pesagens e medidas, sua evolução aparece aqui."
       />
     )
   }
 
+  const labels = data.map((d) => formatData(d.data).slice(0, 5))
+  const pesos = data.map((d) => d.peso_kg ?? 0)
+  const gorduras = data.map((d) => d.percentual_gordura ?? 0)
+  const cinturas = data.map((d) => d.circunferencias?.cintura ?? 0)
+
+  const lastPeso = [...data].reverse().find((d) => d.peso_kg !== null)?.peso_kg
+  const firstPeso = data.find((d) => d.peso_kg !== null)?.peso_kg
+  const deltaPeso = lastPeso && firstPeso ? lastPeso - firstPeso : null
+
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Minha evolução</h2>
-      <SparkChart
-        titulo="Peso (kg)"
-        pontos={data.map((d) => ({ data: d.data, valor: d.peso_kg ?? null }))}
-      />
-      <SparkChart
-        titulo="% Gordura"
-        pontos={data.map((d) => ({ data: d.data, valor: d.percentual_gordura ?? null }))}
-      />
-      <SparkChart
-        titulo="Cintura (cm)"
-        pontos={data.map((d) => ({ data: d.data, valor: d.circunferencias?.cintura ?? null }))}
-      />
+    <div className="fade-up" data-screen-label="paciente-evolucao">
+      <div className="page-head">
+        <div>
+          <div className="eyebrow">Minha evolução</div>
+          <h1>O caminho até aqui</h1>
+          <p className="sub">{data.length} avaliação(ões) registrada(s).</p>
+        </div>
+      </div>
+
+      <Card style={{ marginBottom: 14 }}>
+        <CardHeader>
+          <CardTitle>Peso (kg)</CardTitle>
+          {deltaPeso !== null && (
+            <span
+              className="meta"
+              style={{
+                color:
+                  deltaPeso < 0
+                    ? 'color-mix(in oklch, var(--accent) 70%, black)'
+                    : 'var(--clay)',
+              }}
+            >
+              {deltaPeso > 0 ? '+' : ''}
+              {deltaPeso.toFixed(1)} kg desde o início
+            </span>
+          )}
+        </CardHeader>
+        <CardContent>
+          <LineChart
+            series={[{ color: 'var(--accent)', points: pesos }]}
+            labels={labels}
+            yLabel="kg"
+          />
+        </CardContent>
+      </Card>
+
+      {gorduras.some((v) => v > 0) && (
+        <Card style={{ marginBottom: 14 }}>
+          <CardHeader>
+            <CardTitle>% gordura</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <LineChart
+              series={[{ color: 'var(--info)', points: gorduras }]}
+              labels={labels}
+              yLabel="%"
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {cinturas.some((v) => v > 0) && (
+        <Card style={{ marginBottom: 14 }}>
+          <CardHeader>
+            <CardTitle>Cintura (cm)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <LineChart
+              series={[{ color: 'var(--clay)', points: cinturas }]}
+              labels={labels}
+              yLabel="cm"
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
           <CardTitle>Histórico</CardTitle>
         </CardHeader>
         <CardContent>
-          <ul className="divide-y divide-gray-100">
+          <ul style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {[...data].reverse().map((a) => (
-              <li key={a.id} className="flex justify-between py-2 text-sm">
-                <span>{formatData(a.data)}</span>
-                <span className="text-gray-600">
-                  {a.peso_kg ? `${a.peso_kg} kg ` : ''}
-                  {a.percentual_gordura ? `· ${a.percentual_gordura}% gordura` : ''}
+              <li
+                key={a.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  padding: '6px 0',
+                  borderBottom: '0.5px solid var(--line-2)',
+                  fontSize: 13,
+                }}
+              >
+                <span className="tnum">{formatData(a.data)}</span>
+                <span className="muted tnum">
+                  {a.peso_kg ? `${a.peso_kg} kg` : '—'}
+                  {a.percentual_gordura ? ` · ${a.percentual_gordura}%` : ''}
                 </span>
               </li>
             ))}
@@ -92,71 +153,5 @@ export function PacienteEvolucaoPage() {
         </CardContent>
       </Card>
     </div>
-  )
-}
-
-interface Ponto {
-  data: string
-  valor: number | null
-}
-
-/**
- * Sparkline SVG mínimo — evita dependência de chart lib enquanto o volume é baixo.
- * Quando passar de ~50 pontos por gráfico, vale trocar por recharts.
- */
-function SparkChart({ titulo, pontos }: { titulo: string; pontos: Ponto[] }) {
-  const validos = pontos.filter((p): p is { data: string; valor: number } => p.valor !== null)
-  if (validos.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{titulo}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-gray-500">Sem dados registrados.</p>
-        </CardContent>
-      </Card>
-    )
-  }
-  const min = Math.min(...validos.map((p) => p.valor))
-  const max = Math.max(...validos.map((p) => p.valor))
-  const range = max - min || 1
-  const w = 600
-  const h = 120
-  const px = (i: number) => (validos.length === 1 ? w / 2 : (i / (validos.length - 1)) * w)
-  const py = (v: number) => h - ((v - min) / range) * h
-  const d = validos
-    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${px(i).toFixed(1)} ${py(p.valor).toFixed(1)}`)
-    .join(' ')
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{titulo}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <svg viewBox={`0 0 ${w} ${h + 20}`} className="w-full">
-          <path d={d} fill="none" stroke="#059669" strokeWidth="2" />
-          {validos.map((p, i) => (
-            <g key={p.data}>
-              <circle cx={px(i)} cy={py(p.valor)} r="3" fill="#059669" />
-              {(i === 0 || i === validos.length - 1) && (
-                <text
-                  x={px(i)}
-                  y={h + 15}
-                  textAnchor={i === 0 ? 'start' : 'end'}
-                  className="fill-gray-500 text-[10px]"
-                >
-                  {formatData(p.data)}
-                </text>
-              )}
-            </g>
-          ))}
-        </svg>
-        <p className="mt-2 text-xs text-gray-500">
-          Mín: {min} · Máx: {max} · Último: {validos[validos.length - 1].valor}
-        </p>
-      </CardContent>
-    </Card>
   )
 }

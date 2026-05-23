@@ -1,72 +1,34 @@
-import { useState } from 'react'
-import { cn } from '@/lib/utils'
-import { getInitials } from '@/lib/utils'
+import type { HTMLAttributes } from 'react'
+import { cn, getInitials } from '@/lib/utils'
 
 export type AvatarSize = 'sm' | 'md' | 'lg' | 'xl'
-export type AvatarStatus = 'online' | 'offline'
+export type AvatarTone = 'accent' | 'clay' | 'slate' | 'warm'
 
-const sizeStyles: Record<AvatarSize, string> = {
-  sm: 'h-8 w-8 text-xs',
-  md: 'h-10 w-10 text-sm',
-  lg: 'h-12 w-12 text-base',
-  xl: 'h-16 w-16 text-lg',
-}
-
-const statusSizeStyles: Record<AvatarSize, string> = {
-  sm: 'h-2 w-2',
-  md: 'h-2.5 w-2.5',
-  lg: 'h-3 w-3',
-  xl: 'h-3.5 w-3.5',
-}
-
-export interface AvatarProps {
-  src?: string | null
-  alt?: string
-  name?: string
+export interface AvatarProps extends HTMLAttributes<HTMLDivElement> {
+  nome?: string
+  iniciais?: string
+  url?: string | null
   size?: AvatarSize
-  status?: AvatarStatus
-  className?: string
+  tone?: AvatarTone
 }
 
-function Avatar({ src, alt, name = '', size = 'md', status, className }: AvatarProps) {
-  const [imgError, setImgError] = useState(false)
-  const showImage = src && !imgError
-  const initials = getInitials(name)
+const sizeClass: Record<AvatarSize, string> = { sm: 'sm', md: '', lg: 'lg', xl: 'xl' }
 
+export function Avatar({ nome, iniciais, url, size = 'md', tone, className, ...props }: AvatarProps) {
+  const label = iniciais ?? (nome ? getInitials(nome) : '?')
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt={nome ?? 'avatar'}
+        className={cn('ava', sizeClass[size], className)}
+        style={{ objectFit: 'cover' }}
+      />
+    )
+  }
   return (
-    <div className={cn('relative inline-flex shrink-0', className)}>
-      <div
-        className={cn(
-          'flex items-center justify-center overflow-hidden rounded-full bg-blue-100 font-medium text-blue-600',
-          sizeStyles[size],
-        )}
-      >
-        {showImage ? (
-          <img
-            src={src}
-            alt={alt ?? name}
-            className="h-full w-full object-cover"
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <span aria-label={name || undefined}>{initials}</span>
-        )}
-      </div>
-
-      {status && (
-        <span
-          className={cn(
-            'absolute bottom-0 right-0 rounded-full border-2 border-white',
-            statusSizeStyles[size],
-            status === 'online' ? 'bg-green-500' : 'bg-gray-400',
-          )}
-          aria-label={status === 'online' ? 'Online' : 'Offline'}
-        />
-      )}
+    <div className={cn('ava', sizeClass[size], tone, className)} {...props}>
+      {label}
     </div>
   )
 }
-
-Avatar.displayName = 'Avatar'
-
-export { Avatar }

@@ -16,7 +16,6 @@ export function CadastroPage() {
   const {
     register,
     handleSubmit,
-    watch,
     formState: { errors },
     setValue,
   } = useForm<CadastroInput>({
@@ -44,29 +43,28 @@ export function CadastroPage() {
     const { data: signupData, error: signupErr } = await supabase.auth.signUp({
       email: data.email,
       password: data.senha,
-      options: {
-        data: { nome: data.nome, role: data.papel },
-      },
+      options: { data: { nome: data.nome, role: data.papel } },
     })
 
     if (signupErr) {
       setLoading(false)
-      log({ tipo: 'auth.cadastro_fail', severidade: 'erro', request_id: requestId, payload: { mensagem: signupErr.message } })
+      log({
+        tipo: 'auth.cadastro_fail',
+        severidade: 'erro',
+        request_id: requestId,
+        payload: { mensagem: signupErr.message },
+      })
       toastError('Não foi possível criar a conta', signupErr.message)
       return
     }
 
-    // Se é nutricionista, cria o registro em nutricionistas com slug derivado.
     if (data.papel === 'nutricionista' && signupData.user) {
       const slugBase = slugify(data.nome || data.email.split('@')[0])
       const slug = `${slugBase}-${signupData.user.id.slice(0, 6)}`
-
-      // Atualiza o profile com nome (caso o trigger não tenha capturado).
       await supabase
         .from('profiles')
         .update({ nome: data.nome, consentimento_lgpd_em: new Date().toISOString() })
         .eq('id', signupData.user.id)
-
       const { error: nutriErr } = await supabase.from('nutricionistas').insert({
         profile_id: signupData.user.id,
         crn: data.crn,
@@ -75,10 +73,17 @@ export function CadastroPage() {
         duracao_consulta_min: 60,
         ativo: true,
       })
-
       if (nutriErr) {
-        log({ tipo: 'cadastro.nutri_insert_fail', severidade: 'erro', request_id: requestId, payload: { mensagem: nutriErr.message } })
-        toastError('Conta criada, mas houve um erro ao salvar o CRN. Edite o perfil em seguida.', nutriErr.message)
+        log({
+          tipo: 'cadastro.nutri_insert_fail',
+          severidade: 'erro',
+          request_id: requestId,
+          payload: { mensagem: nutriErr.message },
+        })
+        toastError(
+          'Conta criada, mas o CRN não foi salvo. Edite o perfil em seguida.',
+          nutriErr.message,
+        )
       }
     } else if (signupData.user) {
       await supabase
@@ -87,57 +92,81 @@ export function CadastroPage() {
         .eq('id', signupData.user.id)
     }
 
-    log({ tipo: 'auth.cadastro_ok', request_id: requestId, duracao_ms: Math.round(performance.now() - t0), payload: { papel: data.papel } })
+    log({
+      tipo: 'auth.cadastro_ok',
+      request_id: requestId,
+      duracao_ms: Math.round(performance.now() - t0),
+      payload: { papel: data.papel },
+    })
 
     setLoading(false)
-    toastSuccess('Conta criada! Confira seu e-mail se a confirmação estiver habilitada.')
+    toastSuccess('Conta criada!', 'Confira seu e-mail se a confirmação estiver habilitada.')
     navigate('/')
   }
 
   return (
-    <div className="space-y-6">
-      <header className="space-y-2">
-        <h2 className="text-2xl font-bold text-gray-900">Criar conta</h2>
-        <p className="text-sm text-gray-600">
-          Já tem cadastro?{' '}
-          <Link to="/login" className="font-medium text-emerald-700 hover:underline">
-            Entrar
-          </Link>
-        </p>
-      </header>
+    <div className="fade-up">
+      <div className="eyebrow" style={{ marginBottom: 4 }}>
+        Criar conta
+      </div>
+      <h1 style={{ fontSize: 32, marginBottom: 8 }}>Vamos começar</h1>
+      <p style={{ color: 'var(--ink-3)', fontSize: 14, marginBottom: 22 }}>
+        Já tem conta?{' '}
+        <Link to="/login" style={{ color: 'var(--accent)', fontWeight: 500 }}>
+          Entrar
+        </Link>
+        .
+      </p>
 
-      <div className="grid grid-cols-2 gap-2 rounded-lg bg-gray-100 p-1">
-        <button
-          type="button"
-          onClick={() => trocarPapel('nutricionista')}
-          className={`rounded-md py-2 text-sm font-medium transition ${
-            papel === 'nutricionista'
-              ? 'bg-white text-emerald-700 shadow'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Sou nutricionista
-        </button>
-        <button
-          type="button"
-          onClick={() => trocarPapel('paciente')}
-          className={`rounded-md py-2 text-sm font-medium transition ${
-            papel === 'paciente'
-              ? 'bg-white text-emerald-700 shadow'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Sou paciente
-        </button>
+      {/* Segmented control */}
+      <div
+        style={{
+          display: 'flex',
+          background: 'var(--paper-2)',
+          border: '0.5px solid var(--line)',
+          borderRadius: 10,
+          padding: 3,
+          marginBottom: 18,
+        }}
+      >
+        {[
+          { v: 'nutricionista', l: 'Sou nutricionista' },
+          { v: 'paciente', l: 'Sou paciente' },
+        ].map((opt) => {
+          const active = papel === opt.v
+          return (
+            <button
+              key={opt.v}
+              type="button"
+              onClick={() => trocarPapel(opt.v as 'nutricionista' | 'paciente')}
+              style={{
+                appearance: 'none',
+                border: 0,
+                flex: 1,
+                padding: '8px 0',
+                borderRadius: 7,
+                background: active ? 'var(--paper-3)' : 'transparent',
+                color: active ? 'var(--ink)' : 'var(--ink-3)',
+                font: 'inherit',
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: 'default',
+                boxShadow: active ? 'var(--shadow-1)' : 'none',
+              }}
+            >
+              {opt.l}
+            </button>
+          )
+        })}
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'grid', gap: 14 }}>
         <input type="hidden" {...register('papel')} value={papel} />
-
         <Input
           label="Nome completo"
-          placeholder="Como deve aparecer no seu perfil"
+          placeholder="Como deve aparecer no perfil"
           autoComplete="name"
+          inputSize="lg"
           {...register('nome')}
           error={errors.nome?.message}
         />
@@ -146,6 +175,7 @@ export function CadastroPage() {
           label="E-mail"
           placeholder="voce@email.com"
           autoComplete="email"
+          inputSize="lg"
           {...register('email')}
           error={errors.email?.message}
         />
@@ -154,38 +184,47 @@ export function CadastroPage() {
           label="Senha"
           placeholder="Mínimo 6 caracteres"
           autoComplete="new-password"
+          inputSize="lg"
           {...register('senha')}
           error={errors.senha?.message}
         />
-
         {papel === 'nutricionista' && (
           <Input
             label="CRN"
             placeholder="Ex.: CRN-3 12345"
+            inputSize="lg"
             {...register('crn' as never)}
             error={(errors as { crn?: { message?: string } }).crn?.message}
           />
         )}
 
-        <label className="flex items-start gap-2 text-sm text-gray-700">
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 10,
+            fontSize: 12.5,
+            color: 'var(--ink-2)',
+            lineHeight: 1.5,
+            marginTop: 4,
+          }}
+        >
           <input
             type="checkbox"
-            className="mt-1 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
             {...register('consentimentoLgpd')}
+            style={{ marginTop: 2 }}
           />
           <span>
-            Aceito o tratamento dos meus dados conforme a{' '}
-            <a className="text-emerald-700 hover:underline" href="#">
-              política de privacidade
-            </a>{' '}
-            (LGPD).
+            Aceito o tratamento dos meus dados conforme a política de privacidade (LGPD).
           </span>
         </label>
-        {watch('consentimentoLgpd') !== true && errors.consentimentoLgpd && (
-          <p className="-mt-2 text-xs text-red-500">{errors.consentimentoLgpd.message}</p>
+        {errors.consentimentoLgpd && (
+          <p className="err" style={{ marginTop: -8 }}>
+            {errors.consentimentoLgpd.message as string}
+          </p>
         )}
 
-        <Button type="submit" loading={loading} className="w-full">
+        <Button type="submit" variant="primary" size="lg" loading={loading} style={{ width: '100%' }}>
           Criar conta
         </Button>
       </form>

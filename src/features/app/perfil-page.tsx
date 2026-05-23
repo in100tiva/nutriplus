@@ -4,16 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useAuth } from '@/hooks/use-auth'
 import { supabase } from '@/lib/supabase'
-import {
-  Button,
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Input,
-  Textarea,
-  Loading,
-} from '@/components/ui'
+import { Button, Input, Textarea, Loading, Badge } from '@/components/ui'
 import { perfilNutriSchema, type PerfilNutriInput, slugify } from '@/lib/validators'
 import { toastSuccess, toastError } from '@/hooks/use-toast'
 import { brlParaCentavos, centavosParaBRL } from '@/lib/utils'
@@ -113,14 +104,18 @@ export function PerfilNutriPage() {
         .eq('id', nutri.id)
       if (nutriErr) throw nutriErr
 
-      // Sincronizar especialidades (delete + insert simples para MVP)
-      await supabase.from('nutricionista_especialidades').delete().eq('nutricionista_id', nutri.id)
+      await supabase
+        .from('nutricionista_especialidades')
+        .delete()
+        .eq('nutricionista_id', nutri.id)
       if (input.especialidades.length > 0) {
         const rows = input.especialidades.map((eid) => ({
           nutricionista_id: nutri.id,
           especialidade_id: eid,
         }))
-        const { error: espErr } = await supabase.from('nutricionista_especialidades').insert(rows)
+        const { error: espErr } = await supabase
+          .from('nutricionista_especialidades')
+          .insert(rows)
         if (espErr) throw espErr
       }
 
@@ -139,17 +134,15 @@ export function PerfilNutriPage() {
     onError: (err: Error) => toastError('Erro ao salvar', err.message),
   })
 
-  if (isLoading) return <Loading label="Carregando perfil..." />
+  if (isLoading) return <Loading label="Carregando perfil…" />
   if (!nutri) {
     return (
-      <Card>
-        <CardContent className="pt-6">
-          <p className="text-sm text-gray-600">
-            Seu cadastro profissional ainda não foi criado. Saia e crie a conta como
-            nutricionista.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="card">
+        <p style={{ fontSize: 13.5, color: 'var(--ink-2)' }}>
+          Seu cadastro profissional ainda não foi criado. Saia e crie a conta como
+          nutricionista.
+        </p>
+      </div>
     )
   }
 
@@ -158,104 +151,123 @@ export function PerfilNutriPage() {
   return (
     <form
       onSubmit={handleSubmit((d) => salvarMutation.mutate(d))}
-      className="mx-auto max-w-3xl space-y-6"
+      className="fade-up"
+      style={{ display: 'grid', gap: 18, maxWidth: 880, margin: '0 auto' }}
     >
-      <Card>
-        <CardHeader>
-          <CardTitle>Perfil profissional</CardTitle>
-          <p className="text-sm text-gray-500">
-            Essas informações sustentam a sua página pública futura ({' '}
-            <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">/nutri/{watch('slug')}</code> ).
+      <div className="page-head">
+        <div>
+          <div className="eyebrow">Perfil profissional</div>
+          <h1>Como você aparece</h1>
+          <p className="sub">
+            Essas informações sustentam sua página pública futura.{' '}
+            <span className="mono" style={{ fontSize: 12 }}>
+              /nutri/{watch('slug') || '…'}
+            </span>
           </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Input label="Nome" {...register('nome')} error={errors.nome?.message} />
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Badge variant={watch('ativo') ? 'accent' : 'default'}>
+            {watch('ativo') ? 'ativo' : 'inativo'}
+          </Badge>
+        </div>
+      </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+      <div className="card">
+        <div className="sec">
+          <h3>Identidade</h3>
+          <span className="meta">públicas após "Publicar"</span>
+        </div>
+        <div style={{ display: 'grid', gap: 14 }}>
+          <Input label="Nome" {...register('nome')} error={errors.nome?.message} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <Input label="CRN" {...register('crn')} error={errors.crn?.message} />
             <Input
               label="Slug (URL pública)"
               {...register('slug')}
               onBlur={(e) => setValue('slug', slugify(e.target.value), { shouldDirty: true })}
+              helperText="apenas letras minúsculas, números e hífen"
               error={errors.slug?.message}
-              helperText="Use só letras minúsculas, números e hífens"
             />
           </div>
-
           <Textarea
             label="Bio"
             rows={4}
             {...register('bio')}
-            error={errors.bio?.message}
             helperText="Como você se apresenta para o paciente"
+            error={errors.bio?.message}
           />
+        </div>
+      </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input
-              label={`Valor da consulta (${centavosParaBRL(watch('valor_consulta_centavos'))})`}
-              placeholder="R$ 150,00"
-              onChange={(e) =>
-                setValue('valor_consulta_centavos', brlParaCentavos(e.target.value), {
-                  shouldDirty: true,
-                })
-              }
-              error={errors.valor_consulta_centavos?.message}
-            />
-            <Input
-              type="number"
-              min={15}
-              max={240}
-              label="Duração da consulta (min)"
-              {...register('duracao_consulta_min', { valueAsNumber: true })}
-              error={errors.duracao_consulta_min?.message}
-            />
-          </div>
+      <div className="card">
+        <div className="sec">
+          <h3>Consulta</h3>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <Input
+            label={`Valor — ${centavosParaBRL(watch('valor_consulta_centavos'))}`}
+            placeholder="R$ 150,00"
+            onChange={(e) =>
+              setValue('valor_consulta_centavos', brlParaCentavos(e.target.value), {
+                shouldDirty: true,
+              })
+            }
+            error={errors.valor_consulta_centavos?.message}
+          />
+          <Input
+            type="number"
+            min={15}
+            max={240}
+            label="Duração (min)"
+            {...register('duracao_consulta_min', { valueAsNumber: true })}
+            error={errors.duracao_consulta_min?.message}
+          />
+        </div>
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 13,
+            color: 'var(--ink-2)',
+            marginTop: 14,
+          }}
+        >
+          <input type="checkbox" {...register('ativo')} />
+          Cadastro ativo — visível para pacientes
+        </label>
+      </div>
 
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-              {...register('ativo')}
-            />
-            Cadastro ativo (visível para pacientes)
-          </label>
-        </CardContent>
-      </Card>
+      <div className="card">
+        <div className="sec">
+          <h3>Especialidades</h3>
+          <span className="meta">{selecionadas.size} selecionadas</span>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {(especialidades ?? []).map((e) => {
+            const ativa = selecionadas.has(e.id)
+            return (
+              <button
+                key={e.id}
+                type="button"
+                onClick={() => {
+                  const novas = new Set(selecionadas)
+                  if (ativa) novas.delete(e.id)
+                  else novas.add(e.id)
+                  setValue('especialidades', Array.from(novas), { shouldDirty: true })
+                }}
+                className={ativa ? 'chip accent' : 'chip'}
+                style={{ cursor: 'default', padding: '5px 12px' }}
+              >
+                {e.nome}
+              </button>
+            )
+          })}
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Especialidades</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {(especialidades ?? []).map((e) => {
-              const ativa = selecionadas.has(e.id)
-              return (
-                <button
-                  key={e.id}
-                  type="button"
-                  onClick={() => {
-                    const novas = new Set(selecionadas)
-                    if (ativa) novas.delete(e.id)
-                    else novas.add(e.id)
-                    setValue('especialidades', Array.from(novas), { shouldDirty: true })
-                  }}
-                  className={`rounded-full border px-3 py-1 text-sm transition ${
-                    ativa
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {e.nome}
-                </button>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-end">
-        <Button type="submit" loading={isSubmitting}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <Button type="submit" variant="primary" loading={isSubmitting}>
           Salvar alterações
         </Button>
       </div>

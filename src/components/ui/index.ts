@@ -16,7 +16,7 @@ export type { BadgeProps, BadgeVariant, BadgeSize } from './badge'
 export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './card'
 
 export { Avatar } from './avatar'
-export type { AvatarProps, AvatarSize, AvatarStatus } from './avatar'
+export type { AvatarProps, AvatarSize, AvatarTone } from './avatar'
 
 export { Modal, ModalHeader, ModalTitle, ModalDescription, ModalBody, ModalFooter } from './modal'
 export type { ModalProps, ModalHeaderProps, ModalSize } from './modal'

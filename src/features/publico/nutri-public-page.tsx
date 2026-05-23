@@ -1,31 +1,39 @@
 import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { HeartPulse, ArrowLeft, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/use-auth'
-import {
-  Button,
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Loading,
-  EmptyState,
-} from '@/components/ui'
+import { Button, Card, Loading, EmptyState, Badge } from '@/components/ui'
 import { centavosParaBRL } from '@/lib/utils'
 import { formatDataHora } from '@/lib/format'
 import { toastError, toastSuccess } from '@/hooks/use-toast'
 import { newRequestId, log } from '@/lib/observability'
+import { IconChevL, IconUser } from '@/components/icons'
+
+interface Nutri {
+  id: string
+  profile_id: string
+  crn: string
+  bio: string | null
+  slug: string
+  valor_consulta_centavos: number
+  duracao_consulta_min: number
+  ativo: boolean
+  profiles: { nome: string; avatar_url: string | null } | null
+  nutricionista_especialidades: Array<{ especialidades: { nome: string } | null }>
+}
+
+interface Slot {
+  slot_inicio: string
+  slot_fim: string
+}
 
 export function NutriPublicPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const session = useAuth((s) => s.session)
-  const [selecionado, setSelecionado] = useState<{ slot_inicio: string; slot_fim: string } | null>(
-    null,
-  )
+  const [selecionado, setSelecionado] = useState<Slot | null>(null)
 
   const { data: nutri, isLoading } = useQuery({
     queryKey: ['nutri-publico', slug],
@@ -39,7 +47,7 @@ export function NutriPublicPage() {
         .eq('slug', slug!)
         .eq('ativo', true)
         .maybeSingle()
-      return data
+      return data as unknown as Nutri | null
     },
   })
 
@@ -56,7 +64,7 @@ export function NutriPublicPage() {
         p_fim: fim.toISOString(),
       })
       if (error) throw error
-      return data ?? []
+      return (data ?? []) as Slot[]
     },
   })
 
@@ -90,7 +98,7 @@ export function NutriPublicPage() {
       })
     },
     onSuccess: () => {
-      toastSuccess('Consulta agendada! Confira em "Consultas".')
+      toastSuccess('Consulta agendada!', 'Confira em "Consultas".')
       setSelecionado(null)
       queryClient.invalidateQueries({ queryKey: ['slots'] })
       navigate('/paciente/agendamentos')
@@ -98,160 +106,246 @@ export function NutriPublicPage() {
     onError: (err: Error) => toastError('Não foi possível agendar', err.message),
   })
 
-  if (isLoading) return <Loading label="Carregando perfil..." />
+  if (isLoading) return <Loading label="Carregando perfil…" />
   if (!nutri) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-16">
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
         <EmptyState
+          icon={<IconUser />}
           title="Profissional não encontrado"
           description="Verifique o link ou volte para a página inicial."
+          action={
+            <Link to="/" className="btn">
+              <IconChevL />
+              Voltar
+            </Link>
+          }
         />
-        <div className="mt-6 text-center">
-          <Link to="/">
-            <Button variant="outline">
-              <ArrowLeft className="h-4 w-4" /> Voltar
-            </Button>
-          </Link>
-        </div>
       </div>
     )
   }
 
-  const nomePerfil =
-    (nutri.profiles as { nome?: string; avatar_url?: string } | null)?.nome ?? 'Nutricionista'
-  const especialidades =
-    (
-      nutri.nutricionista_especialidades as unknown as
-        | Array<{ especialidades: { nome: string } | null }>
-        | null
-    )
-      ?.map((e) => e.especialidades?.nome ?? '')
-      .filter(Boolean) ?? []
+  const nomePerfil = nutri.profiles?.nome ?? 'Nutricionista'
+  const especialidades = (nutri.nutricionista_especialidades ?? [])
+    .map((e) => e.especialidades?.nome ?? '')
+    .filter(Boolean)
+
+  // Agrupar slots por dia
+  const slotsByDay = new Map<string, Slot[]>()
+  for (const s of slots ?? []) {
+    const dia = new Date(s.slot_inicio).toLocaleDateString('pt-BR', {
+      weekday: 'long',
+      day: '2-digit',
+      month: 'short',
+    })
+    const arr = slotsByDay.get(dia) ?? []
+    arr.push(s)
+    slotsByDay.set(dia, arr)
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white">
-              <HeartPulse className="h-4 w-4" />
-            </div>
-            <span className="font-semibold">NutriPlus</span>
-          </Link>
+    <div style={{ minHeight: '100vh', background: 'var(--paper)' }}>
+      <header
+        style={{
+          padding: '16px 24px',
+          borderBottom: '0.5px solid var(--line)',
+          display: 'flex',
+          alignItems: 'center',
+        }}
+      >
+        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="brand-mark">N</div>
+          <span className="brand-wm">
+            Nutri<em></em>
+          </span>
+        </Link>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           {session ? (
-            <Link to="/paciente/agendamentos">
-              <Button variant="ghost" size="sm">
-                Minhas consultas
-              </Button>
+            <Link to="/paciente/agendamentos" className="btn ghost">
+              Minhas consultas
             </Link>
           ) : (
-            <Link to="/login">
-              <Button variant="ghost" size="sm">
-                Entrar
-              </Button>
+            <Link to="/login" className="btn ghost">
+              Entrar
             </Link>
           )}
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-8">
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <div className="flex items-center gap-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-2xl font-semibold text-emerald-700">
-                  {nomePerfil.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <CardTitle>{nomePerfil}</CardTitle>
-                  <p className="text-sm text-gray-500">CRN {nutri.crn}</p>
-                </div>
+      <main
+        style={{
+          maxWidth: 980,
+          margin: '0 auto',
+          padding: '36px 24px 80px',
+        }}
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 18, marginBottom: 24 }}>
+          <Card>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div className="ava xl">{nomePerfil.charAt(0).toUpperCase()}</div>
+              <div style={{ minWidth: 0 }}>
+                <div className="eyebrow">Nutricionista</div>
+                <h1 style={{ fontSize: 30, marginTop: 4 }}>{nomePerfil}</h1>
+                <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+                  CRN {nutri.crn}
+                </p>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {especialidades.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {especialidades.map((e) => (
-                    <span
-                      key={e}
-                      className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700"
-                    >
-                      {e}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {nutri.bio ? (
-                <p className="text-sm leading-relaxed text-gray-700">{nutri.bio}</p>
-              ) : (
-                <p className="text-sm text-gray-400">Sem biografia cadastrada.</p>
-              )}
-            </CardContent>
+            </div>
+            {especialidades.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 14 }}>
+                {especialidades.map((e) => (
+                  <Badge key={e} variant="accent">
+                    {e}
+                  </Badge>
+                ))}
+              </div>
+            )}
+            {nutri.bio ? (
+              <p
+                style={{
+                  fontSize: 14,
+                  color: 'var(--ink-2)',
+                  marginTop: 16,
+                  lineHeight: 1.55,
+                }}
+              >
+                {nutri.bio}
+              </p>
+            ) : (
+              <p className="muted" style={{ fontSize: 13, marginTop: 16 }}>
+                Sem biografia.
+              </p>
+            )}
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Consulta</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-emerald-700">
-                {centavosParaBRL(nutri.valor_consulta_centavos)}
-              </p>
-              <p className="mt-1 flex items-center gap-1 text-sm text-gray-500">
-                <Clock className="h-4 w-4" /> {nutri.duracao_consulta_min} minutos
-              </p>
-              <p className="mt-3 text-xs text-gray-500">
-                O pagamento, quando aplicável, é combinado fora da plataforma neste momento.
-              </p>
-            </CardContent>
+            <div className="eyebrow" style={{ marginBottom: 6 }}>
+              Consulta
+            </div>
+            <div
+              className="serif tnum"
+              style={{ fontSize: 30, color: 'var(--accent)', fontWeight: 500 }}
+            >
+              {centavosParaBRL(nutri.valor_consulta_centavos)}
+            </div>
+            <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+              {nutri.duracao_consulta_min} minutos · teleconsulta
+            </div>
+            <p className="muted" style={{ fontSize: 12, marginTop: 14, lineHeight: 1.5 }}>
+              Pagamento, quando aplicável, é combinado fora da plataforma neste MVP.
+            </p>
           </Card>
         </div>
 
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Escolha um horário</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Card variant="flush">
+          <div
+            style={{
+              padding: '16px 20px',
+              borderBottom: '0.5px solid var(--line)',
+              display: 'flex',
+              alignItems: 'baseline',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div>
+              <h3 className="serif" style={{ fontSize: 18, fontWeight: 500 }}>
+                Escolha um horário
+              </h3>
+              <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                Slots derivados de{' '}
+                <span className="mono">fn_slots_disponiveis(nutri, intervalo)</span>
+              </div>
+            </div>
+            <div className="muted" style={{ fontSize: 12 }}>
+              próximos 14 dias
+            </div>
+          </div>
+          <div style={{ padding: 20 }}>
             {!slots || slots.length === 0 ? (
               <EmptyState
                 title="Sem horários disponíveis"
                 description="Volte mais tarde ou entre em contato."
               />
             ) : (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                {slots.map((s) => {
-                  const ativo =
-                    selecionado?.slot_inicio === s.slot_inicio &&
-                    selecionado?.slot_fim === s.slot_fim
-                  return (
-                    <button
-                      key={s.slot_inicio}
-                      type="button"
-                      onClick={() => setSelecionado(s)}
-                      className={`rounded-lg border p-3 text-left text-sm transition ${
-                        ativo
-                          ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
-                          : 'border-gray-200 hover:border-emerald-300'
-                      }`}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {Array.from(slotsByDay.entries()).map(([dia, dayslots]) => (
+                  <div key={dia}>
+                    <div
+                      className="lbl"
+                      style={{
+                        fontSize: 10.5,
+                        color: 'var(--ink-3)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.06em',
+                        fontWeight: 600,
+                        marginBottom: 8,
+                      }}
                     >
-                      {formatDataHora(s.slot_inicio)}
-                    </button>
-                  )
-                })}
+                      {dia}
+                    </div>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                        gap: 6,
+                      }}
+                    >
+                      {dayslots.map((s) => {
+                        const ativo = selecionado?.slot_inicio === s.slot_inicio
+                        return (
+                          <button
+                            key={s.slot_inicio}
+                            type="button"
+                            onClick={() => setSelecionado(s)}
+                            className="mono tnum"
+                            style={{
+                              appearance: 'none',
+                              border: ativo ? '1px solid var(--accent)' : '0.5px solid var(--line)',
+                              background: ativo ? 'var(--accent-soft)' : 'var(--paper-2)',
+                              color: ativo
+                                ? 'color-mix(in oklch, var(--accent) 80%, black)'
+                                : 'var(--ink-2)',
+                              padding: '10px 8px',
+                              borderRadius: 8,
+                              font: 'inherit',
+                              fontSize: 13,
+                              fontWeight: 500,
+                              cursor: 'default',
+                            }}
+                          >
+                            {formatDataHora(s.slot_inicio).slice(11)}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
             {selecionado && (
-              <div className="mt-4 flex items-center justify-between rounded-lg bg-emerald-50 p-4">
-                <p className="text-sm text-emerald-900">
-                  Selecionado: <strong>{formatDataHora(selecionado.slot_inicio)}</strong>
-                </p>
-                <Button onClick={() => agendar.mutate()} loading={agendar.isPending}>
+              <div
+                style={{
+                  marginTop: 18,
+                  padding: 14,
+                  background: 'var(--accent-soft)',
+                  borderRadius: 10,
+                  border: '0.5px solid color-mix(in oklch, var(--accent) 25%, var(--line))',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
+                }}
+              >
+                <div style={{ flex: 1, fontSize: 13.5 }}>
+                  Selecionado: <strong>{formatDataHora(selecionado.slot_inicio)}</strong>{' '}
+                  · consulta nasce <Badge variant="accent">confirmada</Badge>
+                </div>
+                <Button variant="primary" onClick={() => agendar.mutate()} loading={agendar.isPending}>
                   {session ? 'Confirmar agendamento' : 'Entrar e agendar'}
                 </Button>
               </div>
             )}
-          </CardContent>
+          </div>
         </Card>
       </main>
     </div>

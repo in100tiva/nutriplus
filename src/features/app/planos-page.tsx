@@ -3,14 +3,10 @@ import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus, UtensilsCrossed } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/use-auth'
 import {
   Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
   Input,
   Select,
   Button,
@@ -23,6 +19,7 @@ import {
   ModalBody,
   ModalFooter,
 } from '@/components/ui'
+import { IconPlus, IconPlate } from '@/components/icons'
 import { planoSchema, type PlanoInput } from '@/lib/validators'
 import { toastError, toastSuccess } from '@/hooks/use-toast'
 import { formatData } from '@/lib/format'
@@ -69,7 +66,6 @@ export function PlanosPage() {
     queryKey: ['planos-nutri', nutri?.id],
     enabled: !!nutri?.id,
     queryFn: async () => {
-      // RLS já filtra. Lista todos os planos de prontuários do nutri.
       const { data, error } = await supabase
         .from('planos_alimentares')
         .select(
@@ -120,85 +116,120 @@ export function PlanosPage() {
   })
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="fade-up" data-screen-label="planos">
+      <div className="page-head">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Planos alimentares</h2>
-          <p className="text-sm text-gray-600">Crie, edite e publique planos para seus pacientes.</p>
+          <div className="eyebrow">Planos alimentares</div>
+          <h1>Crie, edite e publique</h1>
+          <p className="sub">
+            Cada plano tem refeições ordenadas com itens da base TACO. kcal e macros
+            recalculados a cada item — visíveis para o paciente quando publicado.
+          </p>
         </div>
-        <Button onClick={() => setModalOpen(true)}>
-          <Plus className="h-4 w-4" /> Novo plano
+        <Button variant="accent" onClick={() => setModalOpen(true)}>
+          <IconPlus />
+          Novo plano
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Todos os planos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <Loading />
-          ) : !planos || planos.length === 0 ? (
-            <EmptyState
-              icon={<UtensilsCrossed className="h-5 w-5" />}
-              title="Sem planos"
-              description="Comece criando um plano para um paciente."
-            />
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {planos.map((p) => (
-                <li key={p.id} className="flex items-center justify-between py-3">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{p.titulo}</p>
-                    <p className="text-xs text-gray-500">
-                      {p.prontuarios?.profiles?.nome ?? 'Paciente'} · {formatData(p.data_inicio)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={p.publicado ? 'success' : 'default'}>
-                      {p.publicado ? 'publicado' : 'rascunho'}
-                    </Badge>
-                    <Link to={`/app/planos/${p.id}`}>
-                      <Button size="sm" variant="outline">
-                        Abrir
-                      </Button>
-                    </Link>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
+      <Card variant="flush">
+        <div
+          style={{
+            padding: '14px 20px',
+            borderBottom: '0.5px solid var(--line)',
+            display: 'flex',
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+          }}
+        >
+          <h3 className="serif" style={{ fontSize: 18, fontWeight: 500 }}>
+            Todos os planos
+          </h3>
+          <div className="muted" style={{ fontSize: 12 }}>
+            {planos?.length ?? 0} {planos?.length === 1 ? 'plano' : 'planos'}
+          </div>
+        </div>
+        {isLoading ? (
+          <Loading />
+        ) : !planos || planos.length === 0 ? (
+          <EmptyState
+            icon={<IconPlate />}
+            title="Sem planos"
+            description="Crie um plano para um paciente para começar."
+          />
+        ) : (
+          planos.map((p, i) => (
+            <div
+              key={p.id}
+              className="row"
+              style={{
+                paddingInline: 20,
+                borderBottom: i < planos.length - 1 ? '0.5px solid var(--line-2)' : 0,
+              }}
+            >
+              <div
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 8,
+                  background: p.publicado ? 'var(--accent)' : 'var(--paper-2)',
+                  color: p.publicado ? 'var(--on-accent)' : 'var(--ink-3)',
+                  display: 'grid',
+                  placeItems: 'center',
+                  border: p.publicado ? 0 : '0.5px solid var(--line)',
+                  flex: 'none',
+                }}
+              >
+                <IconPlate />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 500 }}>{p.titulo}</div>
+                <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                  {p.prontuarios?.profiles?.nome ?? 'Paciente'} ·{' '}
+                  {formatData(p.data_inicio)}
+                </div>
+              </div>
+              <Badge variant={p.publicado ? 'accent' : 'default'}>
+                {p.publicado ? 'publicado' : 'rascunho'}
+              </Badge>
+              <Link to={`/app/planos/${p.id}`} className="btn sm">
+                Abrir
+              </Link>
+            </div>
+          ))
+        )}
       </Card>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
-        <ModalHeader>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} size="md">
+        <ModalHeader onClose={() => setModalOpen(false)}>
           <ModalTitle>Novo plano alimentar</ModalTitle>
         </ModalHeader>
-        <form onSubmit={handleSubmit((d) => criar.mutate(d))}>
-          <ModalBody className="space-y-4">
-            <Select label="Paciente" {...register('prontuario_id')}>
-              <option value="">Selecione...</option>
-              {(prontuarios ?? []).map((p) => {
-                const nome = (p.profiles as { nome?: string } | null)?.nome ?? 'Paciente'
-                return (
-                  <option key={p.id} value={p.id}>
-                    {nome}
-                  </option>
-                )
-              })}
-            </Select>
-            <Input label="Título" {...register('titulo')} error={errors.titulo?.message} />
-            <div className="grid grid-cols-2 gap-3">
-              <Input type="date" label="Início" {...register('data_inicio')} error={errors.data_inicio?.message} />
-              <Input type="date" label="Fim (opcional)" {...register('data_fim')} error={errors.data_fim?.message} />
+        <form onSubmit={handleSubmit((d) => criar.mutate(d))} style={{ display: 'contents' }}>
+          <ModalBody>
+            <div style={{ display: 'grid', gap: 12 }}>
+              <Select label="Paciente" {...register('prontuario_id')}>
+                <option value="">Selecione…</option>
+                {(prontuarios ?? []).map((p) => {
+                  const nome = (p.profiles as { nome?: string } | null)?.nome ?? 'Paciente'
+                  return (
+                    <option key={p.id} value={p.id}>
+                      {nome}
+                    </option>
+                  )
+                })}
+              </Select>
+              <Input label="Título" {...register('titulo')} error={errors.titulo?.message} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <Input type="date" label="Início" {...register('data_inicio')} error={errors.data_inicio?.message} />
+                <Input type="date" label="Fim (opcional)" {...register('data_fim')} error={errors.data_fim?.message} />
+              </div>
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button variant="ghost" onClick={() => setModalOpen(false)} type="button">
+            <Button onClick={() => setModalOpen(false)} type="button" variant="ghost">
               Cancelar
             </Button>
-            <Button type="submit" loading={isSubmitting}>
+            <Button type="submit" variant="primary" loading={isSubmitting}>
               Criar rascunho
             </Button>
           </ModalFooter>

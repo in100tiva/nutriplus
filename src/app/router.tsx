@@ -59,8 +59,7 @@ function NutriShell() {
   return (
     <DashboardShell
       role="nutricionista"
-      user={{ name: profile?.nome ?? 'Nutricionista', role: 'Nutricionista', avatarUrl: profile?.avatar_url ?? undefined }}
-      perfilHref="/app/perfil"
+      user={{ name: profile?.nome ?? 'Nutricionista', sub: 'Nutricionista', avatarUrl: profile?.avatar_url ?? undefined }}
       onSignOut={async () => {
         await signOut()
         navigate('/login')
@@ -77,7 +76,7 @@ function PacienteShell() {
   return (
     <DashboardShell
       role="paciente"
-      user={{ name: profile?.nome ?? 'Paciente', role: 'Paciente', avatarUrl: profile?.avatar_url ?? undefined }}
+      user={{ name: profile?.nome ?? 'Paciente', sub: 'Paciente', avatarUrl: profile?.avatar_url ?? undefined }}
       onSignOut={async () => {
         await signOut()
         navigate('/login')
@@ -94,7 +93,7 @@ function AdminShell() {
   return (
     <DashboardShell
       role="admin"
-      user={{ name: profile?.nome ?? 'Admin', role: 'Admin', avatarUrl: profile?.avatar_url ?? undefined }}
+      user={{ name: profile?.nome ?? 'Admin', sub: 'Admin', avatarUrl: profile?.avatar_url ?? undefined }}
       onSignOut={async () => {
         await signOut()
         navigate('/login')

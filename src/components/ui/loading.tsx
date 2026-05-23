@@ -1,76 +1,84 @@
-import { Loader2 } from 'lucide-react'
+import type { HTMLAttributes } from 'react'
 import { cn } from '@/lib/utils'
 
-/* ─── Spinner ─────────────────────────────────────────────────── */
-
 export type SpinnerSize = 'sm' | 'md' | 'lg'
-
-const spinnerSizeStyles: Record<SpinnerSize, string> = {
-  sm: 'h-4 w-4',
-  md: 'h-6 w-6',
-  lg: 'h-8 w-8',
-}
+const sizeMap: Record<SpinnerSize, number> = { sm: 14, md: 20, lg: 28 }
 
 export interface SpinnerProps {
   size?: SpinnerSize
   className?: string
 }
 
-function Spinner({ size = 'md', className }: SpinnerProps) {
+export function Spinner({ size = 'md', className }: SpinnerProps) {
+  const s = sizeMap[size]
   return (
-    <Loader2
-      className={cn('animate-spin text-blue-500', spinnerSizeStyles[size], className)}
-      aria-label="Carregando"
-    />
+    <svg
+      className={className}
+      width={s}
+      height={s}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      style={{ color: 'var(--ink-3)' }}
+    >
+      <circle cx="12" cy="12" r="9" strokeOpacity="0.2" />
+      <path d="M21 12a9 9 0 0 0-9-9" strokeLinecap="round">
+        <animateTransform
+          attributeName="transform"
+          type="rotate"
+          from="0 12 12"
+          to="360 12 12"
+          dur="0.8s"
+          repeatCount="indefinite"
+        />
+      </path>
+    </svg>
   )
 }
 
-Spinner.displayName = 'Spinner'
-
-/* ─── Loading ─────────────────────────────────────────────────── */
-
-export interface LoadingProps {
+export interface LoadingProps extends HTMLAttributes<HTMLDivElement> {
   label?: string
-  size?: SpinnerSize
-  className?: string
 }
 
-function Loading({ label = 'Carregando...', size = 'md', className }: LoadingProps) {
+export function Loading({ label = 'Carregando…', className, ...props }: LoadingProps) {
   return (
     <div
-      className={cn('flex flex-col items-center justify-center gap-3 py-12', className)}
-      role="status"
+      className={cn(className)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: 20,
+        color: 'var(--ink-3)',
+        fontSize: 13,
+      }}
+      {...props}
     >
-      <Spinner size={size} />
-      {label && <p className="text-sm text-gray-500">{label}</p>}
+      <Spinner />
+      <span>{label}</span>
     </div>
   )
 }
-
-Loading.displayName = 'Loading'
-
-/* ─── LoadingOverlay ──────────────────────────────────────────── */
 
 export interface LoadingOverlayProps {
   label?: string
-  className?: string
 }
 
-function LoadingOverlay({ label = 'Carregando...', className }: LoadingOverlayProps) {
+export function LoadingOverlay({ label }: LoadingOverlayProps) {
   return (
     <div
-      className={cn(
-        'fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm',
-        className,
-      )}
-      role="status"
+      style={{
+        position: 'absolute',
+        inset: 0,
+        display: 'grid',
+        placeItems: 'center',
+        background: 'color-mix(in oklch, var(--paper) 70%, transparent)',
+        backdropFilter: 'blur(2px)',
+        zIndex: 10,
+      }}
     >
-      <Spinner size="lg" />
-      {label && <p className="mt-3 text-sm font-medium text-gray-600">{label}</p>}
+      <Loading label={label} />
     </div>
   )
 }
-
-LoadingOverlay.displayName = 'LoadingOverlay'
-
-export { Spinner, Loading, LoadingOverlay }

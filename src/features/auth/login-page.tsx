@@ -32,33 +32,48 @@ export function LoginPage() {
     setLoading(false)
 
     if (error) {
-      log({ tipo: 'auth.login_fail', severidade: 'erro', request_id: requestId, payload: { mensagem: error.message } })
+      log({
+        tipo: 'auth.login_fail',
+        severidade: 'erro',
+        request_id: requestId,
+        payload: { mensagem: error.message },
+      })
       toastError('Não foi possível entrar', error.message)
       return
     }
-    log({ tipo: 'auth.login_ok', request_id: requestId, duracao_ms: Math.round(performance.now() - t0) })
+    log({
+      tipo: 'auth.login_ok',
+      request_id: requestId,
+      duracao_ms: Math.round(performance.now() - t0),
+    })
     toastSuccess('Bem-vindo de volta!')
     navigate('/')
   }
 
   return (
-    <div className="space-y-6">
-      <header className="space-y-2">
-        <h2 className="text-2xl font-bold text-gray-900">Entrar</h2>
-        <p className="text-sm text-gray-600">
-          Acesse seu consultório digital.{' '}
-          <Link to="/cadastro" className="font-medium text-emerald-700 hover:underline">
-            Criar conta
-          </Link>
-        </p>
-      </header>
+    <div className="fade-up">
+      <div className="eyebrow" style={{ marginBottom: 4 }}>
+        Acessar consultório
+      </div>
+      <h1 style={{ fontSize: 32, marginBottom: 8 }}>Entrar</h1>
+      <p style={{ color: 'var(--ink-3)', fontSize: 14, marginBottom: 24 }}>
+        Ainda não tem conta?{' '}
+        <Link
+          to="/cadastro"
+          style={{ color: 'var(--accent)', fontWeight: 500 }}
+        >
+          Crie agora
+        </Link>
+        .
+      </p>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'grid', gap: 14 }}>
         <Input
           type="email"
           label="E-mail"
           placeholder="voce@email.com"
           autoComplete="email"
+          inputSize="lg"
           {...register('email')}
           error={errors.email?.message}
         />
@@ -67,13 +82,18 @@ export function LoginPage() {
           label="Senha"
           placeholder="••••••••"
           autoComplete="current-password"
+          inputSize="lg"
           {...register('senha')}
           error={errors.senha?.message}
         />
-        <Button type="submit" loading={loading} className="w-full">
+        <Button type="submit" variant="primary" size="lg" loading={loading} style={{ width: '100%' }}>
           Entrar
         </Button>
       </form>
+
+      <p style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 18 }}>
+        Esqueceu a senha? Por enquanto, peça reset para o admin do projeto.
+      </p>
     </div>
   )
 }

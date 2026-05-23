@@ -1,14 +1,36 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Loading,
-  Badge,
-} from '@/components/ui'
+import { Card, Loading, Badge } from '@/components/ui'
+import { Bar } from '@/components/charts'
+import { IconDownload, IconCheck } from '@/components/icons'
 import { formatDataHora } from '@/lib/format'
+
+interface Query {
+  query: string
+  calls: number
+  total_exec_time_ms: number
+  mean_exec_time_ms: number
+  rows: number
+}
+
+interface Job {
+  id: string
+  job_nome: string
+  iniciado_em: string
+  finalizado_em: string | null
+  status: string
+  itens_processados: number
+  itens_falha: number
+}
+
+interface Evento {
+  id: string
+  tipo: string
+  request_id: string | null
+  payload: unknown
+  severidade: string
+  created_at: string
+}
 
 export function AdminSaudePage() {
   const { data: topQueries, isLoading: lq } = useQuery({
@@ -16,19 +38,17 @@ export function AdminSaudePage() {
     queryFn: async () => {
       const { data, error } = await supabase.rpc('fn_admin_top_queries', { p_limit: 15 })
       if (error) throw error
-      return data ?? []
+      return (data ?? []) as Query[]
     },
   })
-
   const { data: jobs, isLoading: lj } = useQuery({
     queryKey: ['admin-jobs'],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('fn_admin_ultimas_execucoes_jobs', { p_limit: 20 })
       if (error) throw error
-      return data ?? []
+      return (data ?? []) as Job[]
     },
   })
-
   const { data: erros, isLoading: le } = useQuery({
     queryKey: ['admin-erros'],
     queryFn: async () => {
@@ -37,108 +57,286 @@ export function AdminSaudePage() {
         p_limit: 50,
       })
       if (error) throw error
-      return data ?? []
+      return (data ?? []) as Evento[]
     },
   })
 
-  return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Saúde do sistema</h2>
-      <p className="text-sm text-gray-600">
-        Baseline operacional (§9.4): top queries por tempo total, execuções de cron e
-        eventos com severidade <code>erro</code>.
-      </p>
+  const totalMs = (topQueries ?? []).reduce((s, q) => s + Number(q.total_exec_time_ms), 0)
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Top queries (pg_stat_statements)</CardTitle>
-        </CardHeader>
-        <CardContent>
+  return (
+    <div className="fade-up" data-screen-label="admin-saude">
+      <div className="page-head">
+        <div>
+          <div className="eyebrow">/admin/saude</div>
+          <h1>Saúde operacional</h1>
+          <p className="sub">
+            Baseline da §9.4 — quatro métricas observáveis enquanto o tráfego é pequeno,
+            para que a hora de escalar seja decisão de planilha e não de pânico.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Badge size="md">
+            <span className="dot-ok" /> Supabase · sa-east-1
+          </Badge>
+          <button type="button" className="btn">
+            <IconDownload /> Snapshot
+          </button>
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1.6fr) minmax(0, 1fr)',
+          gap: 16,
+        }}
+      >
+        {/* pg_stat_statements */}
+        <Card variant="flush">
+          <div
+            style={{
+              padding: '14px 20px',
+              borderBottom: '0.5px solid var(--line)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div>
+              <h3 className="serif" style={{ fontSize: 18, fontWeight: 500 }}>
+                Top queries · pg_stat_statements
+              </h3>
+              <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                Acumulado · ordenado por tempo total
+              </div>
+            </div>
+            <Badge>{totalMs.toFixed(0)} ms agregados</Badge>
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 80px 70px 70px',
+              gap: 12,
+              padding: '10px 20px',
+              fontSize: 10.5,
+              color: 'var(--ink-3)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              fontWeight: 600,
+              borderBottom: '0.5px solid var(--line-2)',
+            }}
+          >
+            <div>Query</div>
+            <div style={{ textAlign: 'right' }}>Chamadas</div>
+            <div style={{ textAlign: 'right' }}>Total</div>
+            <div style={{ textAlign: 'right' }}>Média</div>
+          </div>
           {lq ? (
             <Loading />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-left text-xs text-gray-500">
-                  <tr>
-                    <th className="py-2">Query</th>
-                    <th className="py-2 text-right">Chamadas</th>
-                    <th className="py-2 text-right">Total (ms)</th>
-                    <th className="py-2 text-right">Média (ms)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(topQueries ?? []).map((q, i: number) => (
-                    <tr key={i} className="border-t border-gray-100">
-                      <td className="py-2 pr-2 font-mono text-xs">{q.query}</td>
-                      <td className="py-2 text-right">{q.calls}</td>
-                      <td className="py-2 text-right">{Number(q.total_exec_time_ms).toFixed(1)}</td>
-                      <td className="py-2 text-right">{Number(q.mean_exec_time_ms).toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            (topQueries ?? []).map((q, i) => {
+              const pct = totalMs > 0 ? Number(q.total_exec_time_ms) / totalMs : 0
+              return (
+                <div
+                  key={i}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 80px 70px 70px',
+                    gap: 12,
+                    padding: '11px 20px',
+                    alignItems: 'center',
+                    borderBottom: i < (topQueries?.length ?? 0) - 1 ? '0.5px solid var(--line-2)' : 0,
+                    fontSize: 12.5,
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div
+                      className="mono"
+                      style={{
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        fontSize: 11.5,
+                        color: 'var(--ink-2)',
+                      }}
+                    >
+                      {q.query}
+                    </div>
+                    <div style={{ marginTop: 4 }}>
+                      <Bar value={pct} max={1} h={4} />
+                    </div>
+                  </div>
+                  <div className="tnum" style={{ textAlign: 'right', color: 'var(--ink-2)' }}>
+                    {Number(q.calls).toLocaleString('pt-BR')}
+                  </div>
+                  <div className="tnum" style={{ textAlign: 'right', color: 'var(--ink-2)' }}>
+                    {Number(q.total_exec_time_ms).toFixed(0)} ms
+                  </div>
+                  <div className="tnum" style={{ textAlign: 'right', color: 'var(--ink-2)' }}>
+                    {Number(q.mean_exec_time_ms).toFixed(1)} ms
+                  </div>
+                </div>
+              )
+            })
+          )}
+          <div
+            style={{
+              padding: '12px 20px',
+              background: 'var(--paper-2)',
+              fontSize: 12,
+              color: 'var(--ink-2)',
+              lineHeight: 1.55,
+            }}
+          >
+            <strong>Regra:</strong> escalar plano só quando CPU sustentada &gt; 70% <em>e</em> nenhuma query
+            única passar de 30% da CPU.
+          </div>
+        </Card>
+
+        {/* Right column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <Card variant="flush">
+            <div
+              style={{
+                padding: '14px 20px',
+                borderBottom: '0.5px solid var(--line)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <h3 className="serif" style={{ fontSize: 17, fontWeight: 500 }}>
+                execucoes_jobs
+              </h3>
+              <Badge variant="accent">
+                <IconCheck /> cron OK
+              </Badge>
             </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Últimas execuções de cron</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {lj ? (
-            <Loading />
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {(jobs ?? []).map((j) => (
-                <li key={j.id} className="flex items-center justify-between py-2 text-sm">
-                  <div>
-                    <p className="font-medium text-gray-900">{j.job_nome}</p>
-                    <p className="text-xs text-gray-500">{formatDataHora(j.iniciado_em)}</p>
+            {lj ? (
+              <Loading />
+            ) : (jobs ?? []).length === 0 ? (
+              <div style={{ padding: 16, color: 'var(--ink-3)', fontSize: 13 }}>
+                Sem execuções registradas.
+              </div>
+            ) : (
+              (jobs ?? []).map((j, i) => (
+                <div
+                  key={j.id}
+                  style={{
+                    padding: '10px 20px',
+                    borderBottom: i < (jobs ?? []).length - 1 ? '0.5px solid var(--line-2)' : 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    fontSize: 12.5,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: 999,
+                      flex: 'none',
+                      background:
+                        j.status === 'ok'
+                          ? 'var(--accent-2)'
+                          : j.status === 'parcial'
+                            ? 'var(--warn)'
+                            : 'var(--danger)',
+                    }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      className="mono"
+                      style={{
+                        fontSize: 11.5,
+                        color: 'var(--ink-2)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {j.job_nome}
+                    </div>
+                    <div className="muted tnum" style={{ fontSize: 10.5, marginTop: 1 }}>
+                      {formatDataHora(j.iniciado_em)}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-gray-600">
-                      {j.itens_processados} ok / {j.itens_falha} falha
+                  <div className="tnum" style={{ textAlign: 'right', fontSize: 11.5 }}>
+                    <span style={{ color: 'var(--ink-2)' }}>{j.itens_processados}</span>
+                    {j.itens_falha > 0 && (
+                      <span style={{ color: 'var(--warn)', marginLeft: 4 }}>
+                        · {j.itens_falha} ⚠
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </Card>
+
+          <Card variant="flush">
+            <div style={{ padding: '14px 20px', borderBottom: '0.5px solid var(--line)' }}>
+              <h3 className="serif" style={{ fontSize: 17, fontWeight: 500 }}>
+                eventos_sistema
+              </h3>
+              <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+                retenção 90 dias · sem PII
+              </div>
+            </div>
+            {le ? (
+              <Loading />
+            ) : (erros ?? []).length === 0 ? (
+              <div style={{ padding: 16, color: 'var(--ink-3)', fontSize: 13 }}>
+                Sem erros recentes — bom sinal.
+              </div>
+            ) : (
+              (erros ?? []).map((e, i) => (
+                <div
+                  key={e.id}
+                  style={{
+                    padding: '10px 20px',
+                    borderBottom: i < (erros ?? []).length - 1 ? '0.5px solid var(--line-2)' : 0,
+                    fontSize: 12,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Badge variant="warn">{e.tipo}</Badge>
+                    <span
+                      className="mono tnum muted-2"
+                      style={{ fontSize: 10.5, marginLeft: 'auto' }}
+                    >
+                      {formatDataHora(e.created_at)}
                     </span>
-                    <Badge variant={j.status === 'ok' ? 'success' : j.status === 'parcial' ? 'warning' : 'danger'}>
-                      {j.status}
-                    </Badge>
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Eventos recentes com severidade erro</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {le ? (
-            <Loading />
-          ) : (erros ?? []).length === 0 ? (
-            <p className="text-sm text-gray-500">Sem erros nos últimos eventos.</p>
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {(erros ?? []).map((e) => (
-                <li key={e.id} className="py-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="font-medium text-gray-900">{e.tipo}</span>
-                    <span className="text-xs text-gray-500">{formatDataHora(e.created_at)}</span>
+                  <div
+                    className="mono"
+                    style={{ fontSize: 11.5, color: 'var(--ink-2)', marginTop: 4 }}
+                  >
+                    <span style={{ color: 'var(--ink-4)' }}>
+                      request_id={e.request_id ?? '—'}
+                    </span>
                   </div>
-                  <pre className="mt-1 overflow-x-auto rounded bg-gray-50 p-2 text-xs text-gray-700">
+                  <pre
+                    style={{
+                      marginTop: 4,
+                      padding: 8,
+                      background: 'var(--paper-2)',
+                      borderRadius: 6,
+                      fontSize: 11,
+                      color: 'var(--ink-2)',
+                      overflow: 'auto',
+                      maxHeight: 120,
+                    }}
+                  >
                     {JSON.stringify(e.payload, null, 2)}
                   </pre>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+                </div>
+              ))
+            )}
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }

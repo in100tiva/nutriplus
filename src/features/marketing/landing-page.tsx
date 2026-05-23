@@ -1,103 +1,185 @@
 import { Link } from 'react-router-dom'
-import { HeartPulse, CalendarCheck, ShieldCheck, LineChart, ArrowRight } from 'lucide-react'
-import { Button } from '@/components/ui'
+import {
+  IconAgenda,
+  IconPlate,
+  IconVideo,
+  IconChart,
+  IconChevR,
+} from '@/components/icons'
+
+const FEATURES = [
+  {
+    icon: IconAgenda,
+    title: 'Agenda + autoagendamento',
+    description:
+      'Defina suas janelas de disponibilidade; o paciente escolhe o horário e a consulta nasce confirmada — sem etapa de pagamento no MVP.',
+  },
+  {
+    icon: IconVideo,
+    title: 'Teleconsulta embutida',
+    description:
+      'Sala de vídeo na própria plataforma via Daily.co. Botão "Entrar" aparece 10 min antes — sem polling, calculado no cliente.',
+  },
+  {
+    icon: IconPlate,
+    title: 'Planos alimentares com TACO',
+    description:
+      'Refeições com itens da base TACO. kcal e macros recalculados a cada item via função SQL nomeada (visível no pg_stat_statements).',
+  },
+  {
+    icon: IconChart,
+    title: 'Evolução compartilhada',
+    description:
+      'Antropometria datada vira gráfico para você e para o paciente. Reforço de progresso por si só.',
+  },
+]
 
 export function LandingPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
-      <header className="border-b border-emerald-100 bg-white/80 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500 text-white">
-              <HeartPulse className="h-5 w-5" />
-            </div>
-            <span className="text-lg font-bold text-gray-900">NutriPlus</span>
+    <div style={{ minHeight: '100vh', background: 'var(--paper)' }}>
+      {/* Header */}
+      <header
+        style={{
+          padding: '18px 32px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 14,
+          borderBottom: '0.5px solid var(--line)',
+          background: 'color-mix(in oklch, var(--paper) 80%, transparent)',
+          backdropFilter: 'blur(10px)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+        }}
+      >
+        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="brand-mark">N</div>
+          <span className="brand-wm">
+            Nutri<em></em>
+          </span>
+        </Link>
+        <span className="chip ml-3 hidden sm:inline-flex" style={{ marginLeft: 12 }}>
+          MVP em construção
+        </span>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <Link to="/login" className="btn ghost">
+            Entrar
           </Link>
-          <div className="flex gap-3">
-            <Link to="/login">
-              <Button variant="ghost" size="sm">
-                Entrar
-              </Button>
-            </Link>
-            <Link to="/cadastro">
-              <Button size="sm">Cadastre-se</Button>
-            </Link>
-          </div>
+          <Link to="/cadastro" className="btn primary">
+            Criar conta
+          </Link>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-20">
-        <section className="grid items-center gap-12 lg:grid-cols-2">
-          <div>
-            <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
-              MVP — versão inicial
-            </span>
-            <h1 className="mt-4 text-4xl font-bold leading-tight text-gray-900 lg:text-5xl">
-              O consultório digital para nutricionistas
-            </h1>
-            <p className="mt-4 text-lg text-gray-600">
-              Receba pacientes, atenda online, mantenha planos alimentares e acompanhe
-              evolução — sem precisar de planilha, WhatsApp ou ferramenta extra.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link to="/cadastro">
-                <Button size="lg">
-                  Começar agora <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-              <Link to="/login">
-                <Button size="lg" variant="outline">
-                  Já tenho conta
-                </Button>
-              </Link>
-            </div>
-          </div>
-          <div className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-lg">
-            <div className="space-y-4">
-              <Feature icon={CalendarCheck} title="Agenda + autoagendamento">
-                Defina sua disponibilidade semanal; o paciente escolhe o horário e a
-                consulta já vira <strong>confirmada</strong>.
-              </Feature>
-              <Feature icon={ShieldCheck} title="Prontuário com LGPD">
-                Cada nutricionista enxerga só seus pacientes — isolamento garantido por
-                Row Level Security no banco.
-              </Feature>
-              <Feature icon={LineChart} title="Evolução visível">
-                Antropometria datada vira gráfico para você e para o paciente — reforço
-                de progresso por si só.
-              </Feature>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      <footer className="border-t border-gray-200 bg-white py-6">
-        <p className="mx-auto max-w-6xl px-4 text-center text-sm text-gray-500">
-          © {new Date().getFullYear()} NutriPlus
+      {/* Hero */}
+      <section
+        style={{
+          padding: '88px 32px 64px',
+          maxWidth: 1080,
+          margin: '0 auto',
+        }}
+      >
+        <div className="eyebrow" style={{ marginBottom: 14 }}>
+          Consultório digital · nutricionistas
+        </div>
+        <h1
+          style={{
+            fontSize: 56,
+            lineHeight: 1.02,
+            letterSpacing: '-0.025em',
+            maxWidth: 820,
+          }}
+        >
+          O <em style={{ color: 'var(--accent)' }}>escritório virtual</em> para receber
+          pacientes, atender online e acompanhar evolução — sem ferramenta extra.
+        </h1>
+        <p
+          style={{
+            marginTop: 18,
+            fontSize: 17,
+            color: 'var(--ink-3)',
+            maxWidth: 640,
+            lineHeight: 1.55,
+          }}
+        >
+          Agenda, prontuário, plano alimentar TACO, teleconsulta e gráficos de evolução em
+          uma plataforma só. Cobrança fica para a fase futura — o foco do MVP é o núcleo
+          do produto.
         </p>
-      </footer>
-    </div>
-  )
-}
+        <div style={{ display: 'flex', gap: 10, marginTop: 28 }}>
+          <Link to="/cadastro" className="btn accent lg">
+            Começar como nutricionista
+            <IconChevR />
+          </Link>
+          <Link to="/cadastro" className="btn lg">
+            Sou paciente
+          </Link>
+        </div>
+      </section>
 
-function Feature({
-  icon: Icon,
-  title,
-  children,
-}: {
-  icon: typeof CalendarCheck
-  title: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className="flex items-start gap-3">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100">
-        <Icon className="h-5 w-5 text-emerald-700" />
-      </div>
-      <div>
-        <h3 className="font-semibold text-gray-900">{title}</h3>
-        <p className="text-sm text-gray-600">{children}</p>
-      </div>
+      {/* Feature grid */}
+      <section
+        style={{
+          padding: '32px 32px 96px',
+          maxWidth: 1080,
+          margin: '0 auto',
+        }}
+      >
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: 16,
+          }}
+        >
+          {FEATURES.map((f) => {
+            const Icon = f.icon
+            return (
+              <div key={f.title} className="card">
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    background: 'var(--accent-soft)',
+                    color: 'color-mix(in oklch, var(--accent) 75%, black)',
+                    display: 'grid',
+                    placeItems: 'center',
+                    marginBottom: 14,
+                  }}
+                >
+                  <Icon />
+                </div>
+                <h3 className="serif" style={{ fontSize: 20, fontWeight: 500 }}>
+                  {f.title}
+                </h3>
+                <p style={{ marginTop: 6, fontSize: 13.5, color: 'var(--ink-3)', lineHeight: 1.55 }}>
+                  {f.description}
+                </p>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer
+        style={{
+          borderTop: '0.5px solid var(--line)',
+          padding: '20px 32px',
+          display: 'flex',
+          gap: 20,
+          alignItems: 'center',
+          fontSize: 12,
+          color: 'var(--ink-3)',
+          background: 'var(--paper-2)',
+        }}
+      >
+        <div>© {new Date().getFullYear()} Nutri</div>
+        <div className="ml-auto" style={{ marginLeft: 'auto' }}>
+          Construído com Supabase, React, Tailwind e Daily.co
+        </div>
+      </footer>
     </div>
   )
 }
