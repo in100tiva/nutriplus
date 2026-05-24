@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { cn } from '@/lib/utils'
 
 export interface EmptyStateProps {
   icon?: ReactNode
@@ -9,31 +8,41 @@ export interface EmptyStateProps {
   className?: string
 }
 
-function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
+export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
   return (
     <div
-      className={cn(
-        'flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50/50 px-6 py-12 text-center',
-        className,
-      )}
+      className={className}
+      style={{
+        textAlign: 'center',
+        padding: '32px 20px',
+        color: 'var(--ink-3)',
+      }}
     >
       {icon && (
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-500">
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            background: 'var(--paper-2)',
+            border: '0.5px solid var(--line)',
+            color: 'var(--ink-3)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 10,
+          }}
+        >
           {icon}
         </div>
       )}
-
-      <h3 className="text-base font-semibold text-gray-900">{title}</h3>
-
+      <h3 style={{ color: 'var(--ink)', fontSize: 15, fontWeight: 600 }}>{title}</h3>
       {description && (
-        <p className="mt-1.5 max-w-sm text-sm text-gray-500">{description}</p>
+        <p style={{ fontSize: 13, marginTop: 4, maxWidth: 380, marginInline: 'auto' }}>
+          {description}
+        </p>
       )}
-
-      {action && <div className="mt-4">{action}</div>}
+      {action && <div style={{ marginTop: 14 }}>{action}</div>}
     </div>
   )
 }
-
-EmptyState.displayName = 'EmptyState'
-
-export { EmptyState }

@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(npx -y @luanpdd/kit-mcp --help)",
+      "mcp__kit__kit",
+      "mcp__0a712001-6cbb-44ef-a5f4-a24ea40894fa__get_project",
+      "mcp__kit__gates",
+      "mcp__0a712001-6cbb-44ef-a5f4-a24ea40894fa__list_tables",
+      "mcp__0a712001-6cbb-44ef-a5f4-a24ea40894fa__list_migrations",
+      "mcp__0a712001-6cbb-44ef-a5f4-a24ea40894fa__list_extensions",
+      "mcp__0a712001-6cbb-44ef-a5f4-a24ea40894fa__get_publishable_keys",
+      "mcp__kit__auto-install",
+      "mcp__0a712001-6cbb-44ef-a5f4-a24ea40894fa__apply_migration",
+      "mcp__0a712001-6cbb-44ef-a5f4-a24ea40894fa__get_advisors",
+      "mcp__0a712001-6cbb-44ef-a5f4-a24ea40894fa__generate_typescript_types",
+      "mcp__0a712001-6cbb-44ef-a5f4-a24ea40894fa__deploy_edge_function",
+      "mcp__0a712001-6cbb-44ef-a5f4-a24ea40894fa__execute_sql"
+    ]
+  }
+}

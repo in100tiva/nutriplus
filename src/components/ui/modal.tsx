@@ -1,26 +1,11 @@
-import {
-  forwardRef,
-  useEffect,
-  useCallback,
-  useState,
-  type HTMLAttributes,
-  type ReactNode,
-  type MouseEvent,
-} from 'react'
+import { useEffect, useState, type HTMLAttributes, type ReactNode, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-
-/* ─── Types ───────────────────────────────────────────────────── */
+import { IconX } from '@/components/icons'
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl'
 
-const sizeStyles: Record<ModalSize, string> = {
-  sm: 'max-w-sm',
-  md: 'max-w-lg',
-  lg: 'max-w-2xl',
-  xl: 'max-w-4xl',
-}
+const sizeMap: Record<ModalSize, number> = { sm: 380, md: 520, lg: 680, xl: 880 }
 
 export interface ModalProps {
   open: boolean
@@ -28,79 +13,75 @@ export interface ModalProps {
   size?: ModalSize
   children: ReactNode
   className?: string
-  /** When true the backdrop click will NOT close the modal */
   persistent?: boolean
 }
 
-/* ─── Modal (root) ────────────────────────────────────────────── */
-
-function Modal({ open, onClose, size = 'md', children, className, persistent = false }: ModalProps) {
+export function Modal({ open, onClose, size = 'md', children, className, persistent }: ModalProps) {
   const [visible, setVisible] = useState(false)
   const [animating, setAnimating] = useState(false)
 
-  // Open animation
   useEffect(() => {
     if (open) {
       setVisible(true)
-      // Trigger enter transition on next frame
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setAnimating(true)
-        })
-      })
+      requestAnimationFrame(() => requestAnimationFrame(() => setAnimating(true)))
     } else {
       setAnimating(false)
-      const timer = setTimeout(() => setVisible(false), 200)
-      return () => clearTimeout(timer)
+      const t = setTimeout(() => setVisible(false), 200)
+      return () => clearTimeout(t)
     }
   }, [open])
 
-  // ESC key handler
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    },
-    [onClose],
-  )
-
   useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !persistent) onClose()
+    }
     if (open) {
-      document.addEventListener('keydown', handleKeyDown)
+      document.addEventListener('keydown', onKey)
       document.body.style.overflow = 'hidden'
     }
     return () => {
-      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('keydown', onKey)
       document.body.style.overflow = ''
     }
-  }, [open, handleKeyDown])
-
-  const handleBackdropClick = (e: MouseEvent<HTMLDivElement>) => {
-    if (!persistent && e.target === e.currentTarget) {
-      onClose()
-    }
-  }
+  }, [open, persistent, onClose])
 
   if (!visible) return null
 
+  const handleBackdrop = (e: MouseEvent<HTMLDivElement>) => {
+    if (!persistent && e.target === e.currentTarget) onClose()
+  }
+
   return createPortal(
     <div
-      className={cn(
-        'fixed inset-0 z-50 flex items-center justify-center p-4',
-        'transition-colors duration-200',
-        animating ? 'bg-black/50' : 'bg-black/0',
-      )}
-      onClick={handleBackdropClick}
-      aria-modal="true"
       role="dialog"
+      aria-modal="true"
+      className="scrim"
+      onClick={handleBackdrop}
+      style={{
+        display: 'grid',
+        placeItems: 'center',
+        padding: 16,
+        background: animating ? 'rgba(20,15,10,.32)' : 'rgba(20,15,10,0)',
+        transition: 'background .2s ease',
+      }}
     >
       <div
-        className={cn(
-          'relative w-full rounded-lg bg-white shadow-xl',
-          'transition-all duration-200',
-          animating ? 'scale-100 opacity-100' : 'scale-95 opacity-0',
-          sizeStyles[size],
-          className,
-        )}
+        className={cn(className)}
+        style={{
+          width: '100%',
+          maxWidth: sizeMap[size],
+          background: 'var(--paper-3)',
+          border: '0.5px solid var(--line)',
+          borderRadius: 14,
+          boxShadow: 'var(--shadow-3)',
+          transform: animating ? 'scale(1)' : 'scale(0.96)',
+          opacity: animating ? 1 : 0,
+          transition: 'transform .2s, opacity .2s',
+          maxHeight: 'calc(100vh - 32px)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
       >
         {children}
       </div>
@@ -109,91 +90,66 @@ function Modal({ open, onClose, size = 'md', children, className, persistent = f
   )
 }
 
-Modal.displayName = 'Modal'
-
-/* ─── ModalHeader ─────────────────────────────────────────────── */
-
 export interface ModalHeaderProps extends HTMLAttributes<HTMLDivElement> {
   onClose?: () => void
 }
 
-const ModalHeader = forwardRef<HTMLDivElement, ModalHeaderProps>(
-  ({ className, children, onClose, ...props }, ref) => (
+export function ModalHeader({ className, children, onClose, ...props }: ModalHeaderProps) {
+  return (
     <div
-      ref={ref}
-      className={cn('flex items-center justify-between border-b border-gray-200 p-6', className)}
+      className={className}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+        padding: '18px 22px',
+        borderBottom: '0.5px solid var(--line)',
+      }}
       {...props}
     >
-      <div className="flex flex-col gap-1">{children}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>{children}</div>
       {onClose && (
-        <button
-          type="button"
-          onClick={onClose}
-          className={cn(
-            'inline-flex items-center justify-center rounded-lg p-1 text-gray-400',
-            'transition-colors hover:bg-gray-100 hover:text-gray-600',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40',
-          )}
-          aria-label="Fechar"
-        >
-          <X className="h-5 w-5" />
+        <button className="icon-btn" onClick={onClose} aria-label="Fechar">
+          <IconX />
         </button>
       )}
     </div>
-  ),
-)
-ModalHeader.displayName = 'ModalHeader'
+  )
+}
 
-/* ─── ModalTitle ──────────────────────────────────────────────── */
+export function ModalTitle({ className, children, ...props }: HTMLAttributes<HTMLHeadingElement>) {
+  return (
+    <h2 className={cn('serif', className)} style={{ fontSize: 21, fontWeight: 500 }} {...props}>
+      {children}
+    </h2>
+  )
+}
 
-const ModalTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadingElement>>(
-  ({ className, ...props }, ref) => (
-    <h2
-      ref={ref}
-      className={cn('text-lg font-semibold text-gray-900', className)}
-      {...props}
-    />
-  ),
-)
-ModalTitle.displayName = 'ModalTitle'
+export function ModalDescription({ className, ...props }: HTMLAttributes<HTMLParagraphElement>) {
+  return <p className={cn('muted', className)} style={{ fontSize: 12.5 }} {...props} />
+}
 
-/* ─── ModalDescription ────────────────────────────────────────── */
+export function ModalBody({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={className} style={{ padding: 22, overflowY: 'auto', minHeight: 0 }} {...props} />
+  )
+}
 
-const ModalDescription = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLParagraphElement>>(
-  ({ className, ...props }, ref) => (
-    <p
-      ref={ref}
-      className={cn('text-sm text-gray-500', className)}
-      {...props}
-    />
-  ),
-)
-ModalDescription.displayName = 'ModalDescription'
-
-/* ─── ModalBody ───────────────────────────────────────────────── */
-
-const ModalBody = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
+export function ModalFooter({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return (
     <div
-      ref={ref}
-      className={cn('p-6', className)}
+      className={className}
+      style={{
+        padding: '14px 22px',
+        borderTop: '0.5px solid var(--line)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        gap: 8,
+        background: 'var(--paper-2)',
+      }}
       {...props}
     />
-  ),
-)
-ModalBody.displayName = 'ModalBody'
-
-/* ─── ModalFooter ─────────────────────────────────────────────── */
-
-const ModalFooter = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn('flex items-center justify-end gap-3 border-t border-gray-200 p-6', className)}
-      {...props}
-    />
-  ),
-)
-ModalFooter.displayName = 'ModalFooter'
-
-export { Modal, ModalHeader, ModalTitle, ModalDescription, ModalBody, ModalFooter }
+  )
+}

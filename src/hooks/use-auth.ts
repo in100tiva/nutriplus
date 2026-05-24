@@ -1,250 +1,110 @@
 import { create } from 'zustand'
-import type { User, AuthError } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabase'
-
-export interface Profile {
-  id: string
-  full_name: string
-  email: string
-  role: 'patient' | 'professional' | 'admin'
-  avatar_url: string | null
-  created_at: string
-  updated_at: string
-}
-
-export interface ProfessionalProfile {
-  id: string
-  profile_id: string
-  display_name: string
-  registration_type: string
-  registration_number: string
-  registration_state: string
-  specialty: string
-  bio: string | null
-  phone: string
-  consultation_price_cents: number | null
-  consultation_duration_minutes: number | null
-  accepts_insurance: boolean
-  offers_telemedicine: boolean
-  verified: boolean
-  rating_average: number
-  rating_count: number
-  created_at: string
-  updated_at: string
-}
+import type { Session } from '@supabase/supabase-js'
+import { supabase, withTimeout } from '@/lib/supabase'
+import { log } from '@/lib/observability'
+import type { Profile, UserRole } from '@/types/database'
 
 interface AuthState {
-  user: User | null
+  session: Session | null
   profile: Profile | null
-  professionalProfile: ProfessionalProfile | null
-  loading: boolean
-  error: string | null
   initialized: boolean
-  signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string, fullName: string, role: string) => Promise<void>
-  signOut: () => Promise<void>
-  updateProfile: (updates: Partial<Profile>) => Promise<void>
-  clearError: () => void
+  loading: boolean
   initialize: () => () => void
+  signOut: () => Promise<void>
+  refreshProfile: () => Promise<void>
 }
 
-async function fetchProfile(userId: string): Promise<Profile | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single()
-
-  if (error) {
-    console.error('Erro ao buscar perfil:', error.message)
+async function carregarProfile(userId: string): Promise<Profile | null> {
+  try {
+    const { data, error } = await withTimeout(
+      Promise.resolve(supabase.from('profiles').select('*').eq('id', userId).maybeSingle()),
+      4000,
+      'carregarProfile',
+    )
+    if (error) {
+      console.warn('[auth] profile_load_fail', error.message)
+      log({ tipo: 'auth.profile_load_fail', severidade: 'erro', payload: { mensagem: error.message } })
+      return null
+    }
+    return data
+  } catch (err) {
+    console.warn('[auth] profile_load_exception', (err as Error).message)
     return null
   }
-
-  return data as Profile
 }
 
-async function fetchProfessionalProfile(userId: string): Promise<ProfessionalProfile | null> {
-  const { data, error } = await supabase
-    .from('professional_profiles')
-    .select('*')
-    .eq('profile_id', userId)
-    .maybeSingle()
-
-  if (error) {
-    console.error('Erro ao buscar perfil profissional:', error.message)
-    return null
-  }
-
-  return data as ProfessionalProfile | null
-}
-
-function formatAuthError(error: AuthError): string {
-  const messages: Record<string, string> = {
-    'Invalid login credentials': 'E-mail ou senha incorretos',
-    'Email not confirmed': 'E-mail não confirmado. Verifique sua caixa de entrada.',
-    'User already registered': 'Este e-mail já está cadastrado',
-    'Password should be at least 6 characters':
-      'A senha deve ter no mínimo 6 caracteres',
-    'Email rate limit exceeded':
-      'Muitas tentativas. Aguarde alguns minutos e tente novamente.',
-  }
-  return messages[error.message] ?? error.message
-}
+let initialized = false
 
 export const useAuth = create<AuthState>((set, get) => ({
-  user: null,
+  session: null,
   profile: null,
-  professionalProfile: null,
-  loading: true,
-  error: null,
   initialized: false,
+  loading: false,
 
-  signIn: async (email: string, password: string) => {
-    set({ loading: true, error: null })
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-      if (error) throw error
-      // Profile will be loaded by the onAuthStateChange listener
-    } catch (err) {
-      const authError = err as AuthError
-      set({ error: formatAuthError(authError), loading: false })
-      throw err
-    }
-  },
+  initialize: () => {
+    if (initialized) return () => {}
+    initialized = true
 
-  signUp: async (email: string, password: string, fullName: string, role: string) => {
-    set({ loading: true, error: null })
-    try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            role,
-          },
-        },
+    console.info('[auth] initialize start')
+    set({ loading: true })
+
+    // Failsafe: se getSession() pendurar (sessão velha, rede offline),
+    // garantimos que a UI sai de "Carregando" depois de 3s.
+    const failsafe = setTimeout(() => {
+      const st = get()
+      if (!st.initialized) {
+        console.warn('[auth] failsafe — getSession() não respondeu em 3s')
+        set({ initialized: true, loading: false })
+      }
+    }, 3000)
+
+    void withTimeout(supabase.auth.getSession(), 4000, 'getSession')
+      .then(async ({ data, error }) => {
+        clearTimeout(failsafe)
+        if (error) {
+          console.warn('[auth] getSession error:', error.message)
+          set({ session: null, profile: null, initialized: true, loading: false })
+          return
+        }
+        const session = data.session
+        const profile = session ? await carregarProfile(session.user.id) : null
+        console.info('[auth] session resolved', { hasSession: !!session, role: profile?.role })
+        set({ session, profile, initialized: true, loading: false })
       })
-      if (error) throw error
-    } catch (err) {
-      const authError = err as AuthError
-      set({ error: formatAuthError(authError), loading: false })
-      throw err
+      .catch((err) => {
+        clearTimeout(failsafe)
+        console.warn('[auth] getSession timeout/throw:', (err as Error).message)
+        set({ session: null, profile: null, initialized: true, loading: false })
+      })
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.info('[auth] state change:', event, !!session)
+      const profile = session ? await carregarProfile(session.user.id) : null
+      set({ session, profile, initialized: true, loading: false })
+    })
+
+    return () => {
+      sub.subscription.unsubscribe()
     }
   },
 
   signOut: async () => {
-    set({ loading: true, error: null })
-    try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      set({
-        user: null,
-        profile: null,
-        professionalProfile: null,
-        loading: false,
-      })
-    } catch (err) {
-      const authError = err as AuthError
-      set({ error: formatAuthError(authError), loading: false })
-      throw err
-    }
+    await supabase.auth.signOut()
+    set({ session: null, profile: null })
   },
 
-  updateProfile: async (updates: Partial<Profile>) => {
-    const { user } = get()
-    if (!user) {
-      set({ error: 'Usuário não autenticado' })
-      return
-    }
-
-    set({ loading: true, error: null })
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id)
-        .select()
-        .single()
-
-      if (error) throw error
-
-      set({ profile: data as Profile, loading: false })
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Erro ao atualizar perfil'
-      set({ error: message, loading: false })
-      throw err
-    }
-  },
-
-  clearError: () => set({ error: null }),
-
-  initialize: () => {
-    // Prevent double initialization
-    if (get().initialized) {
-      return () => {}
-    }
-    set({ initialized: true })
-
-    // Check for existing session on mount
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const [profile, professionalProfile] = await Promise.all([
-          fetchProfile(session.user.id),
-          fetchProfessionalProfile(session.user.id),
-        ])
-        set({
-          user: session.user,
-          profile,
-          professionalProfile,
-          loading: false,
-        })
-      } else {
-        set({ loading: false })
-      }
-    })
-
-    // Listen for auth state changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        const [profile, professionalProfile] = await Promise.all([
-          fetchProfile(session.user.id),
-          fetchProfessionalProfile(session.user.id),
-        ])
-        set({
-          user: session.user,
-          profile,
-          professionalProfile,
-          loading: false,
-          error: null,
-        })
-      } else if (event === 'SIGNED_OUT') {
-        set({
-          user: null,
-          profile: null,
-          professionalProfile: null,
-          loading: false,
-        })
-      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-        set({ user: session.user })
-      } else if (event === 'USER_UPDATED' && session?.user) {
-        const profile = await fetchProfile(session.user.id)
-        set({ user: session.user, profile })
-      }
-    })
-
-    // Return cleanup function
-    return () => {
-      subscription.unsubscribe()
-    }
+  refreshProfile: async () => {
+    const userId = get().session?.user.id
+    if (!userId) return
+    const profile = await carregarProfile(userId)
+    set({ profile })
   },
 }))
+
+export function useUser() {
+  return useAuth((s) => s.session?.user ?? null)
+}
+
+export function useRole(): UserRole | null {
+  return useAuth((s) => s.profile?.role ?? null)
+}

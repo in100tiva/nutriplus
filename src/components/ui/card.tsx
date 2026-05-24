@@ -1,85 +1,51 @@
 import { forwardRef, type HTMLAttributes } from 'react'
 import { cn } from '@/lib/utils'
 
-/* ─── Card ─────────────────────────────────────────────────────── */
+type Variant = 'default' | 'flush' | 'warm' | 'dark'
 
-const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn(
-        'rounded-lg border border-gray-200 bg-white shadow-sm',
-        className,
-      )}
-      {...props}
-    />
+interface CardProps extends HTMLAttributes<HTMLDivElement> {
+  variant?: Variant
+}
+
+export const Card = forwardRef<HTMLDivElement, CardProps>(
+  ({ className, variant = 'default', ...props }, ref) => (
+    <div ref={ref} className={cn('card', variant !== 'default' && variant, className)} {...props} />
   ),
 )
 Card.displayName = 'Card'
 
-/* ─── CardHeader ──────────────────────────────────────────────── */
-
-const CardHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
+export const CardHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn('flex flex-col gap-1.5 p-6', className)}
-      {...props}
-    />
+    <div ref={ref} className={cn('sec', className)} {...props} />
   ),
 )
 CardHeader.displayName = 'CardHeader'
 
-/* ─── CardTitle ───────────────────────────────────────────────── */
-
-const CardTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadingElement>>(
-  ({ className, ...props }, ref) => (
-    <h3
-      ref={ref}
-      className={cn('text-lg font-semibold text-gray-900', className)}
-      {...props}
-    />
-  ),
+export const CardTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadingElement>>(
+  ({ className, ...props }, ref) => <h3 ref={ref} className={cn('serif', className)} style={{ fontWeight: 500, fontSize: 18, letterSpacing: '-0.01em' }} {...props} />,
 )
 CardTitle.displayName = 'CardTitle'
 
-/* ─── CardDescription ─────────────────────────────────────────── */
-
-const CardDescription = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLParagraphElement>>(
+export const CardDescription = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLParagraphElement>>(
   ({ className, ...props }, ref) => (
-    <p
-      ref={ref}
-      className={cn('text-sm text-gray-500', className)}
-      {...props}
-    />
+    <p ref={ref} className={cn('muted', className)} style={{ fontSize: 12.5 }} {...props} />
   ),
 )
 CardDescription.displayName = 'CardDescription'
 
-/* ─── CardContent ─────────────────────────────────────────────── */
-
-const CardContent = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn('p-6 pt-0', className)}
-      {...props}
-    />
-  ),
+export const CardContent = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => <div ref={ref} className={className} {...props} />,
 )
 CardContent.displayName = 'CardContent'
 
-/* ─── CardFooter ──────────────────────────────────────────────── */
-
-const CardFooter = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
+export const CardFooter = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('flex items-center p-6 pt-0', className)}
+      className={className}
+      style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}
       {...props}
     />
   ),
 )
 CardFooter.displayName = 'CardFooter'
-
-export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }

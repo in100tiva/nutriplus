@@ -2,38 +2,26 @@ import { useEffect, type ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/use-auth'
 
-// ─── React Query Client ─────────────────────────────────────────
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      staleTime: 1000 * 60 * 5,
       retry: 1,
       refetchOnWindowFocus: false,
     },
   },
 })
 
-// ─── Auth Initializer ────────────────────────────────────────────
-
 function AuthInitializer({ children }: { children: ReactNode }) {
-  const initialize = useAuth((state) => state.initialize)
-
+  const initialize = useAuth((s) => s.initialize)
   useEffect(() => {
     const cleanup = initialize()
     return cleanup
   }, [initialize])
-
   return <>{children}</>
 }
 
-// ─── Providers ──────────────────────────────────────────────────
-
-interface ProvidersProps {
-  children: ReactNode
-}
-
-export function Providers({ children }: ProvidersProps) {
+export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthInitializer>{children}</AuthInitializer>

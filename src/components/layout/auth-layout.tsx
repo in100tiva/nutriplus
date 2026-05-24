@@ -1,131 +1,152 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { Heart, ShieldCheck, CalendarCheck, Users } from 'lucide-react'
-import { cn } from '@/lib/utils'
 
-// ─── Types ──────────────────────────────────────────────────────
-
-export interface AuthLayoutProps {
-  children: ReactNode
-  className?: string
-}
-
-// ─── Feature highlights for the branding panel ──────────────────
-
-const features = [
+const FEATURES = [
   {
-    icon: CalendarCheck,
-    title: 'Agendamento inteligente',
-    description: 'Gerencie consultas e horários de forma eficiente.',
+    title: 'Agenda + autoagendamento',
+    description:
+      'Defina suas janelas; o paciente escolhe o horário e a consulta nasce confirmada.',
   },
   {
-    icon: ShieldCheck,
-    title: 'Prontuários seguros',
-    description: 'Dados clínicos protegidos com criptografia.',
+    title: 'Prontuário com isolamento RLS',
+    description:
+      'Anamnese, evolução e antropometria — só você e o paciente acessam, pelo Postgres.',
   },
   {
-    icon: Users,
-    title: 'Conexão profissional-paciente',
-    description: 'Comunicação integrada entre profissionais e pacientes.',
+    title: 'Plano alimentar com TACO',
+    description:
+      'Refeições com itens da base TACO; kcal e macros calculados em tempo real.',
   },
   {
-    icon: Heart,
-    title: 'Acompanhamento contínuo',
-    description: 'Tarefas, documentos e avaliações em um só lugar.',
+    title: 'Teleconsulta embutida',
+    description: 'Sala de vídeo dentro da plataforma — sem redirecionar para fora.',
   },
 ]
 
-// ─── Component ──────────────────────────────────────────────────
+export interface AuthLayoutProps {
+  children: ReactNode
+}
 
-export function AuthLayout({ children, className }: AuthLayoutProps) {
+export function AuthLayout({ children }: AuthLayoutProps) {
   return (
-    <div className="flex min-h-screen">
-      {/* Left branding panel - hidden on mobile */}
-      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-slate-900 p-10 text-white lg:flex xl:w-[55%]">
-        {/* Background gradient decoration */}
-        <div className="absolute inset-0 bg-gradient-to-br from-sky-600/20 via-transparent to-indigo-600/20" />
-        <div className="absolute -left-24 -top-24 h-96 w-96 rounded-full bg-sky-500/10 blur-3xl" />
-        <div className="absolute -bottom-24 -right-24 h-96 w-96 rounded-full bg-indigo-500/10 blur-3xl" />
-
-        {/* Logo */}
-        <div className="relative z-10">
-          <Link to="/" className="inline-flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500 text-lg font-bold text-white">
-              M
-            </div>
-            <span className="text-2xl font-bold tracking-tight">MedHub</span>
-          </Link>
-        </div>
-
-        {/* Main content */}
-        <div className="relative z-10 space-y-8">
-          <div className="max-w-md space-y-3">
-            <h1 className="text-3xl font-bold leading-tight xl:text-4xl">
-              A plataforma completa para profissionais de saúde
-            </h1>
-            <p className="text-lg text-slate-300">
-              Simplifique sua rotina clínica, conecte-se com seus pacientes e
-              ofereça um atendimento de excelência.
-            </p>
-          </div>
-
-          {/* Feature list */}
-          <div className="grid max-w-lg gap-4">
-            {features.map((feature) => {
-              const Icon = feature.icon
-              return (
-                <div key={feature.title} className="flex items-start gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10">
-                    <Icon className="h-5 w-5 text-sky-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-white">
-                      {feature.title}
-                    </h3>
-                    <p className="text-sm text-slate-400">
-                      {feature.description}
-                    </p>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="relative z-10">
-          <p className="text-sm text-slate-500">
-            &copy; {new Date().getFullYear()} MedHub. Todos os direitos
-            reservados.
-          </p>
-        </div>
-      </div>
-
-      {/* Right form panel */}
-      <div
-        className={cn(
-          'flex w-full flex-col items-center justify-center px-4 py-8 sm:px-8 lg:w-1/2 xl:w-[45%]',
-          className
-        )}
+    <div className="app" style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', height: '100vh' }}>
+      <aside
+        style={{
+          background: 'var(--ink)',
+          color: 'var(--paper)',
+          padding: '36px 40px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+        className="hidden lg:flex"
       >
-        {/* Mobile logo - visible only on small screens */}
-        <div className="mb-8 lg:hidden">
-          <Link to="/" className="inline-flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500 text-lg font-bold text-white">
-              M
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background:
+              'radial-gradient(60% 40% at 10% 0%, color-mix(in oklch, var(--accent) 28%, transparent), transparent), radial-gradient(60% 50% at 100% 100%, color-mix(in oklch, var(--accent-3) 22%, transparent), transparent)',
+            pointerEvents: 'none',
+          }}
+        />
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 12, color: 'inherit' }}>
+            <div
+              className="brand-mark"
+              style={{ width: 32, height: 32, fontSize: 19, borderRadius: 10 }}
+            >
+              N
             </div>
-            <span className="text-2xl font-bold tracking-tight text-gray-900">
-              MedHub
+            <span
+              className="brand-wm"
+              style={{ color: 'var(--paper)', fontSize: 22 }}
+            >
+              Nutri<em></em>
             </span>
           </Link>
-          <p className="mt-2 text-center text-sm text-gray-500">
-            A plataforma completa para profissionais de saúde
-          </p>
         </div>
+        <div style={{ position: 'relative', zIndex: 1, maxWidth: 460 }}>
+          <h1 style={{ color: 'var(--paper)', fontSize: 38, lineHeight: 1.1 }}>
+            O consultório digital do nutricionista.
+          </h1>
+          <p
+            style={{
+              color: 'color-mix(in oklch, var(--paper) 70%, transparent)',
+              fontSize: 15,
+              marginTop: 14,
+              lineHeight: 1.5,
+            }}
+          >
+            Receba pacientes, atenda online, mantenha planos e evolução em um só lugar.
+          </p>
+          <div style={{ display: 'grid', gap: 14, marginTop: 28 }}>
+            {FEATURES.map((f) => (
+              <div key={f.title} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <div
+                  style={{
+                    width: 8,
+                    height: 8,
+                    marginTop: 7,
+                    borderRadius: 999,
+                    background: 'var(--accent-3)',
+                    flex: 'none',
+                  }}
+                />
+                <div>
+                  <div style={{ fontWeight: 500, fontSize: 13.5 }}>{f.title}</div>
+                  <div
+                    style={{
+                      color: 'color-mix(in oklch, var(--paper) 55%, transparent)',
+                      fontSize: 12.5,
+                      marginTop: 2,
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    {f.description}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            fontSize: 11.5,
+            color: 'color-mix(in oklch, var(--paper) 45%, transparent)',
+          }}
+        >
+          © {new Date().getFullYear()} Nutri · consultório digital
+        </div>
+      </aside>
 
-        {/* Form content area */}
-        <div className="w-full max-w-md">{children}</div>
-      </div>
+      <main
+        style={{
+          display: 'grid',
+          placeItems: 'center',
+          padding: 28,
+          background: 'var(--paper)',
+          overflowY: 'auto',
+        }}
+      >
+        <div style={{ width: '100%', maxWidth: 420 }}>
+          <Link
+            to="/"
+            className="lg:hidden"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 20 }}
+          >
+            <div className="brand-mark">N</div>
+            <span className="brand-wm">
+              Nutri<em></em>
+            </span>
+          </Link>
+          {children}
+        </div>
+      </main>
     </div>
   )
 }

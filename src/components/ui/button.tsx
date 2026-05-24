@@ -1,30 +1,28 @@
 import { forwardRef, type ButtonHTMLAttributes } from 'react'
-import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success'
+export type ButtonVariant =
+  | 'default'
+  | 'primary'
+  | 'accent'
+  | 'ghost'
+  | 'danger'
+  | 'outline'
+  | 'secondary'
 export type ButtonSize = 'sm' | 'md' | 'lg'
 
-const variantStyles: Record<ButtonVariant, string> = {
-  primary:
-    'bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700 focus-visible:ring-blue-500/40',
-  secondary:
-    'bg-gray-100 text-gray-700 hover:bg-gray-200 active:bg-gray-300 focus-visible:ring-gray-400/40',
-  outline:
-    'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 active:bg-gray-100 focus-visible:ring-blue-500/40',
-  ghost:
-    'bg-transparent text-gray-700 hover:bg-gray-100 active:bg-gray-200 focus-visible:ring-gray-400/40',
-  danger:
-    'bg-red-500 text-white hover:bg-red-600 active:bg-red-700 focus-visible:ring-red-500/40',
-  success:
-    'bg-green-500 text-white hover:bg-green-600 active:bg-green-700 focus-visible:ring-green-500/40',
+// `outline` e `secondary` são aliases do default (que já tem borda) para compat
+// com o código existente.
+const variantClass: Record<ButtonVariant, string> = {
+  default: '',
+  outline: '',
+  secondary: '',
+  primary: 'primary',
+  accent: 'accent',
+  ghost: 'ghost',
+  danger: 'danger',
 }
-
-const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'h-8 px-3 text-sm gap-1.5',
-  md: 'h-10 px-4 text-sm gap-2',
-  lg: 'h-12 px-6 text-base gap-2.5',
-}
+const sizeClass: Record<ButtonSize, string> = { sm: 'sm', md: '', lg: 'lg' }
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant
@@ -32,38 +30,35 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean
 }
 
-const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', loading = false, disabled, children, ...props }, ref) => {
-    const isDisabled = disabled || loading
-
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant = 'default', size = 'md', loading, disabled, children, type = 'button', ...props }, ref) => {
     return (
       <button
         ref={ref}
-        type="button"
-        disabled={isDisabled}
-        className={cn(
-          'inline-flex items-center justify-center rounded-lg font-medium transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-          'disabled:pointer-events-none disabled:opacity-50',
-          variantStyles[variant],
-          sizeStyles[size],
-          className,
-        )}
+        type={type}
+        disabled={disabled || loading}
+        className={cn('btn', variantClass[variant], sizeClass[size], className)}
         {...props}
       >
-        {loading ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            {children}
-          </>
-        ) : (
-          children
+        {loading && (
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="9" strokeOpacity="0.25" />
+            <path d="M21 12a9 9 0 0 0-9-9" strokeLinecap="round">
+              <animateTransform
+                attributeName="transform"
+                type="rotate"
+                from="0 12 12"
+                to="360 12 12"
+                dur="0.8s"
+                repeatCount="indefinite"
+              />
+            </path>
+          </svg>
         )}
+        {children}
       </button>
     )
   },
 )
 
 Button.displayName = 'Button'
-
-export { Button }

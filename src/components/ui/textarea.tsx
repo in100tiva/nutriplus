@@ -8,63 +8,26 @@ export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElemen
   wrapperClassName?: string
 }
 
-const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className, label, error, helperText, wrapperClassName, id, ...props }, ref) => {
-    const textareaId = id ?? (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined)
-
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
+  ({ className, label, error, helperText, wrapperClassName, id, rows = 3, ...props }, ref) => {
+    const inputId = id ?? (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined)
     return (
-      <div className={cn('flex flex-col gap-1.5', wrapperClassName)}>
-        {label && (
-          <label
-            htmlFor={textareaId}
-            className="text-sm font-medium text-gray-700"
-          >
-            {label}
-          </label>
-        )}
-
+      <div className={cn('field', wrapperClassName)}>
+        {label && <label htmlFor={inputId}>{label}</label>}
         <textarea
           ref={ref}
-          id={textareaId}
-          className={cn(
-            'flex min-h-[80px] w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900',
-            'placeholder:text-gray-400',
-            'transition-colors',
-            'focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20',
-            'disabled:cursor-not-allowed disabled:bg-gray-50 disabled:opacity-60',
-            'resize-y',
-            error
-              ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20'
-              : 'border-gray-300',
-            className,
-          )}
-          aria-invalid={error ? 'true' : undefined}
-          aria-describedby={
-            error
-              ? `${textareaId}-error`
-              : helperText
-                ? `${textareaId}-helper`
-                : undefined
-          }
+          id={inputId}
+          rows={rows}
+          className={cn('input', className)}
+          style={{ height: 'auto', padding: '8px 10px', lineHeight: 1.5, resize: 'vertical' }}
           {...props}
         />
-
-        {error && (
-          <p id={`${textareaId}-error`} className="text-sm text-red-500">
-            {error}
-          </p>
-        )}
-
+        {error && <p className="err">{error}</p>}
         {!error && helperText && (
-          <p id={`${textareaId}-helper`} className="text-sm text-gray-500">
-            {helperText}
-          </p>
+          <p style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{helperText}</p>
         )}
       </div>
     )
   },
 )
-
 Textarea.displayName = 'Textarea'
-
-export { Textarea }
