@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button, Input } from '@/components/ui'
@@ -7,10 +7,19 @@ import { supabase } from '@/lib/supabase'
 import { cadastroSchema, slugify, type CadastroInput } from '@/lib/validators'
 import { toastError, toastSuccess } from '@/hooks/use-toast'
 import { newRequestId, log } from '@/lib/observability'
+import { useAuth } from '@/hooks/use-auth'
+import type { Profile } from '@/types/database'
 
 export function CadastroPage() {
   const navigate = useNavigate()
-  const [papel, setPapel] = useState<'nutricionista' | 'paciente'>('nutricionista')
+  const [searchParams] = useSearchParams()
+  const returnTo = searchParams.get('return')
+  const papelQuery = searchParams.get('papel') as 'nutricionista' | 'paciente' | null
+  const [papel, setPapel] = useState<'nutricionista' | 'paciente'>(
+    papelQuery === 'paciente' || papelQuery === 'nutricionista'
+      ? papelQuery
+      : 'nutricionista',
+  )
   const [loading, setLoading] = useState(false)
 
   const {
@@ -21,7 +30,7 @@ export function CadastroPage() {
   } = useForm<CadastroInput>({
     resolver: zodResolver(cadastroSchema),
     defaultValues: {
-      papel: 'nutricionista',
+      papel: papel,
       nome: '',
       email: '',
       senha: '',
@@ -99,9 +108,53 @@ export function CadastroPage() {
       payload: { papel: data.papel },
     })
 
+    // Se o supabase já criou a sessão (e-mail confirm desligado),
+    // hidratamos o store para evitar a race no redirect.
+    if (signupData.session) {
+      const userId = signupData.user?.id
+      let profileRow: Profile | null = null
+      if (userId) {
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle()
+        profileRow = prof
+      }
+      useAuth.setState({
+        session: signupData.session,
+        profile: profileRow,
+        initialized: true,
+        loading: false,
+      })
+    }
+
     setLoading(false)
     toastSuccess('Conta criada!', 'Confira seu e-mail se a confirmação estiver habilitada.')
-    navigate('/')
+
+    if (signupData.session) {
+      // Logado automaticamente — respeita ?return= se compatível.
+      const podeRespeitar =
+        returnTo &&
+        (data.papel === 'paciente' ||
+          (!returnTo.startsWith('/paciente') &&
+            !returnTo.startsWith('/app') &&
+            !returnTo.startsWith('/admin')))
+      const destino = podeRespeitar
+        ? returnTo!
+        : data.papel === 'nutricionista'
+          ? '/app'
+          : '/paciente/agendamentos'
+      navigate(destino, { replace: true })
+    } else {
+      // E-mail confirm ligado: precisa confirmar antes; manda para login.
+      navigate(
+        returnTo
+          ? `/login?return=${encodeURIComponent(returnTo)}`
+          : '/login',
+        { replace: true },
+      )
+    }
   }
 
   return (

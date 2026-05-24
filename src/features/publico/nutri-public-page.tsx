@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/use-auth'
@@ -32,8 +32,14 @@ export function NutriPublicPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const session = useAuth((s) => s.session)
+  const { session, profile } = useAuth()
+  const [searchParams] = useSearchParams()
   const [selecionado, setSelecionado] = useState<Slot | null>(null)
+
+  // Slot pré-selecionado via query (?inicio=ISO&fim=ISO) — usado quando
+  // o usuário volta do fluxo de cadastro/login após escolher um horário.
+  const slotInicioQuery = searchParams.get('inicio')
+  const slotFimQuery = searchParams.get('fim')
 
   const { data: nutri, isLoading } = useQuery({
     queryKey: ['nutri-publico', slug],
@@ -68,13 +74,29 @@ export function NutriPublicPage() {
     },
   })
 
+  // Hidrata o slot pré-selecionado quando a lista carrega e a query indica um.
+  useEffect(() => {
+    if (selecionado || !slots || !slotInicioQuery || !slotFimQuery) return
+    const match = slots.find(
+      (s) => s.slot_inicio === slotInicioQuery && s.slot_fim === slotFimQuery,
+    )
+    if (match) setSelecionado(match)
+  }, [slots, slotInicioQuery, slotFimQuery, selecionado])
+
+  const podeAgendarComoPaciente = !session || profile?.role === 'paciente'
+
   const agendar = useMutation({
     mutationFn: async () => {
-      if (!session?.user) {
-        navigate('/cadastro')
-        throw new Error('Faça login ou cadastre-se para agendar')
-      }
       if (!nutri || !selecionado) throw new Error('Slot inválido')
+      if (!session?.user) {
+        // Sem login: redireciona para cadastro preservando slot + slug.
+        const ret = `/nutri/${nutri.slug}?inicio=${encodeURIComponent(selecionado.slot_inicio)}&fim=${encodeURIComponent(selecionado.slot_fim)}`
+        navigate(`/cadastro?papel=paciente&return=${encodeURIComponent(ret)}`)
+        return
+      }
+      if (profile?.role && profile.role !== 'paciente') {
+        throw new Error('Apenas pacientes podem agendar consultas')
+      }
       const rid = newRequestId()
       const t0 = performance.now()
       const { data, error } = await supabase
@@ -98,9 +120,13 @@ export function NutriPublicPage() {
       })
     },
     onSuccess: () => {
-      toastSuccess('Consulta agendada!', 'Confira em "Consultas".')
+      if (!session) return // foi pra cadastro; toast vem de lá
+      toastSuccess('Consulta agendada!', 'Confira em "Minhas consultas".')
       setSelecionado(null)
+      // Invalida slots E a lista de agendamentos do paciente — sem isso o
+      // React Query mostra o cache antigo (vazio) e parece que nada foi marcado.
       queryClient.invalidateQueries({ queryKey: ['slots'] })
+      queryClient.invalidateQueries({ queryKey: ['paciente-agendamentos'] })
       navigate('/paciente/agendamentos')
     },
     onError: (err: Error) => toastError('Não foi possível agendar', err.message),
@@ -158,6 +184,14 @@ export function NutriPublicPage() {
           <span className="brand-wm">
             Nutri<em></em>
           </span>
+        </Link>
+        <Link
+          to="/nutricionistas"
+          className="btn ghost sm"
+          style={{ marginLeft: 14 }}
+        >
+          <IconChevL />
+          Ver outros profissionais
         </Link>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           {session ? (
@@ -334,16 +368,48 @@ export function NutriPublicPage() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 14,
+                  flexWrap: 'wrap',
                 }}
               >
-                <div style={{ flex: 1, fontSize: 13.5 }}>
+                <div style={{ flex: 1, fontSize: 13.5, minWidth: 240 }}>
                   Selecionado: <strong>{formatDataHora(selecionado.slot_inicio)}</strong>{' '}
                   · consulta nasce <Badge variant="accent">confirmada</Badge>
                 </div>
-                <Button variant="primary" onClick={() => agendar.mutate()} loading={agendar.isPending}>
-                  {session ? 'Confirmar agendamento' : 'Entrar e agendar'}
-                </Button>
+                {!podeAgendarComoPaciente ? (
+                  <Badge variant="warn">
+                    Logado como nutri/admin — saia para agendar como paciente
+                  </Badge>
+                ) : (
+                  <Button
+                    variant="primary"
+                    onClick={() => agendar.mutate()}
+                    loading={agendar.isPending}
+                  >
+                    {session ? 'Confirmar agendamento' : 'Cadastrar e agendar'}
+                  </Button>
+                )}
               </div>
+            )}
+            {!session && (
+              <p
+                className="muted"
+                style={{ fontSize: 12, marginTop: 14, lineHeight: 1.5 }}
+              >
+                Já tem conta?{' '}
+                <Link
+                  to={`/login?return=${encodeURIComponent(
+                    `/nutri/${nutri.slug}${
+                      selecionado
+                        ? `?inicio=${encodeURIComponent(selecionado.slot_inicio)}&fim=${encodeURIComponent(selecionado.slot_fim)}`
+                        : ''
+                    }`,
+                  )}`}
+                  style={{ color: 'var(--accent)', fontWeight: 500 }}
+                >
+                  Entrar
+                </Link>
+                .
+              </p>
             )}
           </div>
         </Card>

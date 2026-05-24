@@ -4,12 +4,11 @@ import {
   IconAgenda,
   IconUsers,
   IconPlate,
-  IconVideo,
   IconChart,
   IconUser,
   IconHealth,
-  IconChevD,
   IconBell,
+  IconLogout,
 } from '@/components/icons'
 import type { ComponentType, SVGProps } from 'react'
 import type { UserRole } from '@/types'
@@ -45,8 +44,12 @@ const NUTRI_NAV: { group: string; items: NavItemDef[] }[] = [
         icon: IconUsers,
         match: ['/app/pacientes'],
       },
-      { label: 'Planos alimentares', href: '/app/planos', icon: IconPlate },
-      { label: 'Sala de consulta', href: '/app/consulta', icon: IconVideo },
+      {
+        label: 'Planos alimentares',
+        href: '/app/planos',
+        icon: IconPlate,
+        match: ['/app/planos'],
+      },
     ],
   },
   {
@@ -59,7 +62,8 @@ const PACIENTE_NAV: { group: string; items: NavItemDef[] }[] = [
   {
     group: 'Meu acompanhamento',
     items: [
-      { label: 'Consultas', href: '/paciente/agendamentos', icon: IconAgenda },
+      { label: 'Marcar consulta', href: '/paciente/marcar', icon: IconUser },
+      { label: 'Minhas consultas', href: '/paciente/agendamentos', icon: IconAgenda },
       { label: 'Meu plano', href: '/paciente/plano', icon: IconPlate },
       { label: 'Evolução', href: '/paciente/evolucao', icon: IconChart },
     ],
@@ -119,16 +123,6 @@ export function Sidebar({ role, user, onSignOut }: SidebarProps) {
           <div className="who-name truncate">{user.name}</div>
           {user.sub && <div className="who-sub truncate">{user.sub}</div>}
         </div>
-        <button
-          type="button"
-          onClick={onSignOut}
-          className="icon-btn"
-          style={{ width: 24, height: 24, border: 0, background: 'transparent' }}
-          aria-label="Menu do usuário"
-          title="Sair"
-        >
-          <IconChevD />
-        </button>
       </div>
 
       <nav className="nav">
@@ -156,10 +150,51 @@ export function Sidebar({ role, user, onSignOut }: SidebarProps) {
         ))}
       </nav>
 
+      {/* Botão de Sair — sempre visível e bem destacado */}
+      {onSignOut && (
+        <button
+          type="button"
+          onClick={onSignOut}
+          style={{
+            appearance: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            margin: '8px 10px 4px',
+            padding: '9px 12px',
+            borderRadius: 8,
+            border: 0,
+            background: 'transparent',
+            color: 'var(--ink-3)',
+            font: 'inherit',
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: 'default',
+            textAlign: 'left',
+            width: 'calc(100% - 20px)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'color-mix(in oklch, var(--danger) 12%, transparent)'
+            e.currentTarget.style.color = 'var(--danger)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.color = 'var(--ink-3)'
+          }}
+        >
+          <span className="nav-icon" style={{ color: 'inherit' }}>
+            <IconLogout />
+          </span>
+          Sair da conta
+        </button>
+      )}
+
       <div className="sidebar-footer">
         <span className="dot-ok" />
         <span>Sistemas estáveis</span>
-        {onSignOut && (
+        {/* Botão duplicado no rodapé desativado — o principal está acima. */}
+        {/* eslint-disable-next-line no-constant-binary-expression */}
+        {false && onSignOut && (
           <button
             type="button"
             onClick={onSignOut}

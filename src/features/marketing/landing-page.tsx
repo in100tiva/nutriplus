@@ -6,6 +6,7 @@ import {
   IconChart,
   IconChevR,
 } from '@/components/icons'
+import { Catalogo } from '@/features/marketplace/catalogo'
 
 const FEATURES = [
   {
@@ -106,15 +107,54 @@ export function LandingPage() {
           uma plataforma só. Cobrança fica para a fase futura — o foco do MVP é o núcleo
           do produto.
         </p>
-        <div style={{ display: 'flex', gap: 10, marginTop: 28 }}>
-          <Link to="/cadastro" className="btn accent lg">
-            Começar como nutricionista
+        <div style={{ display: 'flex', gap: 10, marginTop: 28, flexWrap: 'wrap' }}>
+          <Link to="/nutricionistas" className="btn accent lg">
+            Encontrar nutricionista
             <IconChevR />
           </Link>
-          <Link to="/cadastro" className="btn lg">
-            Sou paciente
+          <Link to="/cadastro?papel=nutricionista" className="btn lg">
+            Sou nutricionista
           </Link>
         </div>
+      </section>
+
+      {/* Catálogo destacado — primeiros 6 nutris */}
+      <section
+        style={{
+          padding: '0 32px 80px',
+          maxWidth: 1180,
+          margin: '0 auto',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+            marginBottom: 16,
+            gap: 16,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div>
+            <div className="eyebrow" style={{ marginBottom: 6 }}>
+              Catálogo
+            </div>
+            <h2 style={{ fontSize: 32 }}>Nutricionistas com agenda aberta</h2>
+            <p
+              className="muted"
+              style={{ fontSize: 14, marginTop: 6, maxWidth: 540 }}
+            >
+              Clique em qualquer profissional para ver os horários disponíveis. O
+              cadastro acontece só no momento de confirmar a consulta.
+            </p>
+          </div>
+          <Link to="/nutricionistas" className="btn">
+            Ver todos
+            <IconChevR />
+          </Link>
+        </div>
+        <Catalogo limit={6} compact />
       </section>
 
       {/* Feature grid */}
@@ -125,6 +165,7 @@ export function LandingPage() {
           margin: '0 auto',
         }}
       >
+        <h2 style={{ fontSize: 26, marginBottom: 18 }}>O que está incluído</h2>
         <div
           style={{
             display: 'grid',

@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/use-auth'
-import { Card, Loading, EmptyState, Badge } from '@/components/ui'
+import { Card, Loading, EmptyState, Badge, Button } from '@/components/ui'
 import { Donut, Bar } from '@/components/charts'
-import { IconPlate, IconCheck } from '@/components/icons'
+import { IconPlate, IconCheck, IconDownload } from '@/components/icons'
 import { formatData } from '@/lib/format'
+import { baixarPlanoPdf } from '@/lib/pdf/plano-pdf'
 
 const METAS = { kcal: 2100, carb: 240, prot: 140, lip: 70 }
 
@@ -36,6 +37,9 @@ interface Plano {
   data_inicio: string
   data_fim: string | null
   observacoes: string | null
+  prontuarios: {
+    nutricionistas: { crn: string; profiles: { nome: string } | null } | null
+  } | null
   plano_refeicoes: Refeicao[]
 }
 
@@ -88,7 +92,7 @@ export function PacientePlanoPage() {
       const { data, error } = await supabase
         .from('planos_alimentares')
         .select(
-          'id, titulo, data_inicio, data_fim, observacoes, plano_refeicoes(id, nome, horario, ordem, plano_itens(id, quantidade_g, medida_caseira, alimentos(nome, kcal_por_100g, carboidrato_g, proteina_g, lipidio_g, fibra_g)))',
+          'id, titulo, data_inicio, data_fim, observacoes, prontuarios!planos_alimentares_prontuario_id_fkey(nutricionistas!prontuarios_nutricionista_id_fkey(crn, profiles!nutricionistas_profile_id_fkey(nome))), plano_refeicoes(id, nome, horario, ordem, plano_itens(id, quantidade_g, medida_caseira, alimentos(nome, kcal_por_100g, carboidrato_g, proteina_g, lipidio_g, fibra_g)))',
         )
         .eq('publicado', true)
         .order('data_inicio', { ascending: false })
@@ -122,11 +126,44 @@ export function PacientePlanoPage() {
           <p className="sub">
             Período: {formatData(plano.data_inicio)}
             {plano.data_fim ? ` — ${formatData(plano.data_fim)}` : ' — em vigor'}.
+            {plano.prontuarios?.nutricionistas?.profiles?.nome && (
+              <>
+                {' '}Prescrito por{' '}
+                <em style={{ color: 'var(--ink-2)' }}>
+                  {plano.prontuarios.nutricionistas.profiles.nome}
+                </em>.
+              </>
+            )}
           </p>
         </div>
-        <Badge variant="accent">
-          <IconCheck /> publicado
-        </Badge>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <Badge variant="accent">
+            <IconCheck /> publicado
+          </Badge>
+          <Button
+            variant="primary"
+            onClick={() =>
+              baixarPlanoPdf({
+                plano: {
+                  titulo: plano.titulo,
+                  data_inicio: plano.data_inicio,
+                  data_fim: plano.data_fim,
+                  observacoes: plano.observacoes,
+                  plano_refeicoes: refeicoes,
+                },
+                nutri: {
+                  nome:
+                    plano.prontuarios?.nutricionistas?.profiles?.nome ?? 'Nutricionista',
+                  crn: plano.prontuarios?.nutricionistas?.crn ?? '—',
+                },
+                paciente: { nome: profile?.nome ?? 'Paciente' },
+              })
+            }
+          >
+            <IconDownload />
+            Baixar PDF
+          </Button>
+        </div>
       </div>
 
       {/* Macros dashboard */}

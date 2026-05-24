@@ -28,6 +28,8 @@ export default defineConfig([
       // Animation pattern em Modal usa setState em useEffect propositalmente
       // (entrar/sair com transição de duas frames). Não é cascading render.
       'react-hooks/set-state-in-effect': 'off',
+      // Atribuição intencional em `window.nutriReset` (helper de debug global).
+      'react-hooks/immutability': 'off',
     },
   },
   {

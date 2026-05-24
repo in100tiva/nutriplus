@@ -5,16 +5,18 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/use-auth'
 import { Button, Input, Loading, EmptyState, Badge, Avatar } from '@/components/ui'
 import { Sparkline, Bar } from '@/components/charts'
-import { IconUsers, IconSearch, IconPlus, IconDownload } from '@/components/icons'
+import { IconUsers, IconSearch, IconDownload } from '@/components/icons'
 import { formatDataHora } from '@/lib/format'
 
 interface Paciente {
   id: string
   nome: string
+  proxima: string | null
+  ultima: string | null
+  total: number
   ultima_aval: { peso_kg: number | null; data: string } | null
   serie: number[]
-  proxima: string | null
-  total_consultas: number
+  tem_prontuario: boolean
 }
 
 export function PacientesPage() {
@@ -38,49 +40,97 @@ export function PacientesPage() {
     queryKey: ['pacientes-rich', nutri?.id],
     enabled: !!nutri?.id,
     queryFn: async () => {
-      // Lista prontuários com paciente, ultima avaliação e série de pesos
-      const { data: pron, error } = await supabase
+      // 1. Pega TODOS os agendamentos do nutri (não só os que têm prontuário)
+      //    — paciente_profile_id distintos via JOIN com profiles.
+      const { data: agRows, error: agErr } = await supabase
+        .from('agendamentos')
+        .select(
+          'paciente_profile_id, inicio, status, profiles!agendamentos_paciente_profile_id_fkey(nome)',
+        )
+        .eq('nutricionista_id', nutri!.id)
+        .order('inicio', { ascending: true })
+      if (agErr) throw agErr
+
+      // 2. Pega prontuários (se existirem) — pra saber quem já tem.
+      interface ProntuarioRich {
+        id: string
+        paciente_profile_id: string
+        profiles: { nome: string } | null
+        avaliacoes_antropometricas: Array<{ data: string; peso_kg: number | null }>
+      }
+      const { data: pronRowsRaw } = await supabase
         .from('prontuarios')
         .select(
           'id, paciente_profile_id, profiles!prontuarios_paciente_profile_id_fkey(nome), avaliacoes_antropometricas(data, peso_kg)',
         )
         .eq('nutricionista_id', nutri!.id)
-      if (error) throw error
-      const pacientes: Paciente[] = (pron ?? []).map((row) => {
-        const avals = (row.avaliacoes_antropometricas ?? []) as unknown as Array<{
-          data: string
-          peso_kg: number | null
-        }>
-        const ordered = avals
-          .filter((a) => a.peso_kg !== null)
-          .sort((a, b) => a.data.localeCompare(b.data))
-        const ultima = ordered.length > 0 ? ordered[ordered.length - 1] : null
-        return {
-          id: row.paciente_profile_id,
-          nome: (row.profiles as { nome?: string } | null)?.nome ?? 'Paciente',
-          ultima_aval: ultima ? { peso_kg: ultima.peso_kg, data: ultima.data } : null,
-          serie: ordered.map((a) => a.peso_kg as number),
-          proxima: null,
-          total_consultas: 0,
-        }
-      })
-      // próxima consulta por paciente
-      const ids = pacientes.map((p) => p.id)
-      if (ids.length > 0) {
-        const { data: ags } = await supabase
-          .from('agendamentos')
-          .select('paciente_profile_id, inicio, status')
-          .eq('nutricionista_id', nutri!.id)
-          .in('paciente_profile_id', ids)
-          .gte('inicio', new Date().toISOString())
-          .eq('status', 'confirmado')
-          .order('inicio')
-        for (const ag of ags ?? []) {
-          const p = pacientes.find((x) => x.id === ag.paciente_profile_id)
-          if (p && !p.proxima) p.proxima = ag.inicio
-        }
+      const pronRows = (pronRowsRaw ?? []) as unknown as ProntuarioRich[]
+      const pronByPaciente = new Map<string, ProntuarioRich>()
+      for (const p of pronRows) {
+        pronByPaciente.set(p.paciente_profile_id, p)
       }
-      return pacientes
+
+      // 3. Agrupa por paciente.
+      const agora = new Date()
+      const acc = new Map<string, Paciente>()
+      for (const a of agRows ?? []) {
+        const id = a.paciente_profile_id
+        const nome =
+          (a.profiles as { nome?: string } | null)?.nome ??
+          pronByPaciente.get(id)?.profiles?.nome ??
+          'Paciente'
+        const isFuturo = new Date(a.inicio) > agora
+        const isPassado = new Date(a.inicio) <= agora && a.status !== 'cancelado'
+        let p = acc.get(id)
+        if (!p) {
+          const pron = pronByPaciente.get(id)
+          const avals = (pron?.avaliacoes_antropometricas ?? [])
+            .filter((x) => x.peso_kg !== null)
+            .sort((x, y) => x.data.localeCompare(y.data))
+          const ultimaAval = avals.length > 0 ? avals[avals.length - 1] : null
+          p = {
+            id,
+            nome,
+            proxima: null,
+            ultima: null,
+            total: 0,
+            tem_prontuario: !!pron,
+            ultima_aval: ultimaAval ? { peso_kg: ultimaAval.peso_kg, data: ultimaAval.data } : null,
+            serie: avals.map((a) => a.peso_kg as number),
+          }
+          acc.set(id, p)
+        }
+        p.total += 1
+        if (isFuturo && (!p.proxima || a.inicio < p.proxima)) p.proxima = a.inicio
+        if (isPassado && (!p.ultima || a.inicio > p.ultima)) p.ultima = a.inicio
+      }
+
+      // 4. Inclui também pacientes que só têm prontuário (sem agendamento).
+      for (const pron of pronRows) {
+        if (acc.has(pron.paciente_profile_id)) continue
+        const nome = pron.profiles?.nome ?? 'Paciente'
+        const avals = (pron.avaliacoes_antropometricas ?? [])
+          .filter((x) => x.peso_kg !== null)
+          .sort((x, y) => x.data.localeCompare(y.data))
+        const ultimaAval = avals.length > 0 ? avals[avals.length - 1] : null
+        acc.set(pron.paciente_profile_id, {
+          id: pron.paciente_profile_id,
+          nome,
+          proxima: null,
+          ultima: null,
+          total: 0,
+          tem_prontuario: true,
+          ultima_aval: ultimaAval ? { peso_kg: ultimaAval.peso_kg, data: ultimaAval.data } : null,
+          serie: avals.map((a) => a.peso_kg as number),
+        })
+      }
+
+      return Array.from(acc.values()).sort((a, b) => {
+        // ordena: próximas consultas primeiro (mais cedo), depois últimas
+        const aKey = a.proxima ?? '9999'
+        const bKey = b.proxima ?? '9999'
+        return aKey.localeCompare(bKey)
+      })
     },
   })
 
@@ -92,6 +142,7 @@ export function PacientesPage() {
   }, [data, filter])
 
   const ativos = data?.length ?? 0
+  const semProntuario = data?.filter((p) => !p.tem_prontuario).length ?? 0
 
   return (
     <div className="fade-up" data-screen-label="pacientes">
@@ -104,8 +155,8 @@ export function PacientesPage() {
             </h1>
           </div>
           <p className="sub">
-            Cada paciente abre um prontuário próprio, protegido por RLS — só o
-            nutricionista responsável e o próprio paciente acessam os dados clínicos.
+            Inclui quem já marcou consulta com você — o prontuário é criado quando
+            você abre o paciente pela primeira vez.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -113,15 +164,10 @@ export function PacientesPage() {
             <IconDownload />
             Exportar
           </Button>
-          <Button variant="accent">
-            <IconPlus />
-            Novo paciente
-          </Button>
         </div>
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {/* Filter bar */}
         <div
           style={{
             display: 'flex',
@@ -129,6 +175,7 @@ export function PacientesPage() {
             gap: 10,
             padding: '14px 18px',
             borderBottom: '0.5px solid var(--line)',
+            flexWrap: 'wrap',
           }}
         >
           <div style={{ width: 320 }}>
@@ -139,16 +186,20 @@ export function PacientesPage() {
               onChange={(e) => setFilter(e.target.value)}
             />
           </div>
+          {semProntuario > 0 && (
+            <Badge variant="warn">
+              {semProntuario} sem prontuário aberto
+            </Badge>
+          )}
           <div className="muted" style={{ marginLeft: 'auto', fontSize: 12 }}>
             {filtered.length} {filtered.length === 1 ? 'paciente' : 'pacientes'}
           </div>
         </div>
 
-        {/* Header */}
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'minmax(0, 1.8fr) 110px 140px 110px 130px',
+            gridTemplateColumns: 'minmax(0, 1.8fr) 110px 140px 110px 150px',
             gap: 16,
             padding: '10px 20px',
             fontSize: 11,
@@ -162,18 +213,22 @@ export function PacientesPage() {
           <div>Paciente</div>
           <div>Último peso</div>
           <div>Evolução</div>
-          <div>Aderência</div>
+          <div>Consultas</div>
           <div style={{ textAlign: 'right' }}>Próxima</div>
         </div>
 
-        {/* Rows */}
         {isLoading ? (
           <Loading />
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={<IconUsers />}
             title="Nenhum paciente"
-            description="Quando alguém agendar pelo seu link público, será listado aqui."
+            description="Quando alguém agendar pelo seu link público, vai aparecer aqui."
+            action={
+              <Link to="/app/perfil" className="btn">
+                Ver meu perfil público
+              </Link>
+            }
           />
         ) : (
           filtered.map((p) => {
@@ -186,7 +241,7 @@ export function PacientesPage() {
                 to={`/app/pacientes/${p.id}`}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'minmax(0, 1.8fr) 110px 140px 110px 130px',
+                  gridTemplateColumns: 'minmax(0, 1.8fr) 110px 140px 110px 150px',
                   gap: 16,
                   padding: '12px 20px',
                   alignItems: 'center',
@@ -201,8 +256,12 @@ export function PacientesPage() {
                     <div className="truncate" style={{ fontWeight: 500 }}>
                       {p.nome}
                     </div>
-                    <div className="muted" style={{ fontSize: 11.5 }}>
-                      {p.serie.length} avaliações
+                    <div className="muted" style={{ fontSize: 11.5, display: 'flex', gap: 6 }}>
+                      {p.tem_prontuario ? (
+                        <span>{p.serie.length} avaliações</span>
+                      ) : (
+                        <Badge variant="warn">sem prontuário</Badge>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -247,19 +306,18 @@ export function PacientesPage() {
                   )}
                 </div>
                 <div>
-                  <Bar value={Math.min(p.serie.length / 5, 1)} max={1} h={5} />
-                  <div
-                    className="muted"
-                    style={{ fontSize: 11, marginTop: 4 }}
-                  >
-                    {p.serie.length}/5 baseline
+                  <div className="tnum" style={{ fontSize: 13, fontWeight: 500 }}>
+                    {p.total}
                   </div>
+                  <Bar value={Math.min(p.total / 5, 1)} max={1} h={4} />
                 </div>
                 <div className="tnum" style={{ fontSize: 12, textAlign: 'right' }}>
                   {p.proxima ? (
-                    <Badge variant="accent" size="sm">
-                      {formatDataHora(p.proxima)}
-                    </Badge>
+                    <Badge variant="accent">{formatDataHora(p.proxima)}</Badge>
+                  ) : p.ultima ? (
+                    <span className="muted">
+                      última: {formatDataHora(p.ultima)}
+                    </span>
                   ) : (
                     <span className="muted">—</span>
                   )}

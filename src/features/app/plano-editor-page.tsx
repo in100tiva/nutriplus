@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { Button, Input, Loading, Badge, EmptyState } from '@/components/ui'
+import { baixarPlanoPdf } from '@/lib/pdf/plano-pdf'
 import { Bar } from '@/components/charts'
 import {
   IconChevL,
@@ -13,7 +14,6 @@ import {
   IconDownload,
   IconCheck,
   IconDrag,
-  IconMore,
   IconX,
 } from '@/components/icons'
 import { toastError, toastSuccess } from '@/hooks/use-toast'
@@ -50,7 +50,11 @@ interface Plano {
   publicado: boolean
   data_inicio: string
   data_fim: string | null
-  prontuarios: { profiles: { nome: string } | null } | null
+  observacoes: string | null
+  prontuarios: {
+    profiles: { nome: string } | null
+    nutricionistas: { crn: string; profiles: { nome: string } | null } | null
+  } | null
   plano_refeicoes: Refeicao[]
 }
 
@@ -108,7 +112,7 @@ export function PlanoEditorPage() {
       const { data, error } = await supabase
         .from('planos_alimentares')
         .select(
-          'id, titulo, publicado, data_inicio, data_fim, prontuarios!planos_alimentares_prontuario_id_fkey(profiles!prontuarios_paciente_profile_id_fkey(nome)), plano_refeicoes(id, nome, horario, ordem, plano_itens(id, quantidade_g, medida_caseira, ordem, alimentos(id, nome, categoria, kcal_por_100g, carboidrato_g, proteina_g, lipidio_g, fibra_g)))',
+          'id, titulo, publicado, data_inicio, data_fim, observacoes, prontuarios!planos_alimentares_prontuario_id_fkey(profiles!prontuarios_paciente_profile_id_fkey(nome), nutricionistas!prontuarios_nutricionista_id_fkey(crn, profiles!nutricionistas_profile_id_fkey(nome))), plano_refeicoes(id, nome, horario, ordem, plano_itens(id, quantidade_g, medida_caseira, ordem, alimentos(id, nome, categoria, kcal_por_100g, carboidrato_g, proteina_g, lipidio_g, fibra_g)))',
         )
         .eq('id', id!)
         .maybeSingle()
@@ -122,9 +126,19 @@ export function PlanoEditorPage() {
     [plano],
   )
 
-  if (!activeRefeicao && refeicoes.length > 0) {
-    setActiveRefeicao(refeicoes[0].id)
-  }
+  // Mantém a refeição ativa sincronizada com o que existe no banco.
+  // Se a refeição ativa foi deletada (ou nunca foi escolhida), seleciona
+  // a primeira disponível — sem isso, INSERTs de plano_itens podem usar
+  // um refeicao_id inexistente e falham com 403 na policy RLS.
+  useEffect(() => {
+    if (refeicoes.length === 0) {
+      if (activeRefeicao) setActiveRefeicao(null)
+      return
+    }
+    if (!activeRefeicao || !refeicoes.some((r) => r.id === activeRefeicao)) {
+      setActiveRefeicao(refeicoes[0].id)
+    }
+  }, [refeicoes, activeRefeicao])
 
   const total = macrosDoPlano(refeicoes)
 
@@ -195,9 +209,26 @@ export function PlanoEditorPage() {
             <IconCopy />
             Duplicar
           </Button>
-          <Button>
+          <Button
+            onClick={() =>
+              baixarPlanoPdf({
+                plano: {
+                  titulo: plano.titulo,
+                  data_inicio: plano.data_inicio,
+                  data_fim: plano.data_fim,
+                  observacoes: plano.observacoes,
+                  plano_refeicoes: refeicoes,
+                },
+                nutri: {
+                  nome: plano.prontuarios?.nutricionistas?.profiles?.nome ?? 'Nutricionista',
+                  crn: plano.prontuarios?.nutricionistas?.crn ?? '—',
+                },
+                paciente: { nome: pacienteNome },
+              })
+            }
+          >
             <IconDownload />
-            Exportar
+            Exportar PDF
           </Button>
           {plano.publicado ? (
             <Button variant="accent" onClick={() => togglePub.mutate()} loading={togglePub.isPending}>
@@ -386,13 +417,18 @@ function RefeicaoCard({
         </div>
         <button
           type="button"
-          className="icon-btn"
+          className="btn sm ghost"
+          title="Remover esta refeição"
           onClick={(e) => {
             e.stopPropagation()
-            removeRefeicao.mutate()
+            const ok = window.confirm(
+              `Remover a refeição "${refeicao.nome}" e seus ${refeicao.plano_itens.length} item(ns)?`,
+            )
+            if (ok) removeRefeicao.mutate()
           }}
+          style={{ color: 'var(--ink-3)' }}
         >
-          <IconMore />
+          <IconTrash />
         </button>
       </div>
 

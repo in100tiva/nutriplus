@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { Card, Button, Loading, EmptyState, Badge } from '@/components/ui'
 import { formatDataHora } from '@/lib/format'
 import { toastError, toastSuccess } from '@/hooks/use-toast'
-import { IconAgenda, IconVideo, IconBell } from '@/components/icons'
+import { IconAgenda, IconVideo, IconBell, IconPlus } from '@/components/icons'
 
 type Item = {
   id: string
@@ -88,6 +88,10 @@ export function PacienteAgendamentosPage() {
               : 'Você ainda não tem consultas marcadas.'}
           </p>
         </div>
+        <Link to="/paciente/marcar" className="btn accent">
+          <IconPlus />
+          Marcar nova consulta
+        </Link>
       </div>
 
       {/* Hero card: próxima consulta */}
@@ -115,7 +119,13 @@ export function PacienteAgendamentosPage() {
           <EmptyState
             icon={<IconAgenda />}
             title="Sem consultas marcadas"
-            description="Acesse o link do seu nutricionista para agendar."
+            description="Veja o catálogo de nutricionistas e marque sua primeira."
+            action={
+              <Link to="/paciente/marcar" className="btn accent">
+                <IconPlus />
+                Marcar consulta
+              </Link>
+            }
           />
         ) : (
           proximas.map((a, i) => {

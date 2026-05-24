@@ -16,7 +16,9 @@ import { ConsultaPage } from '@/features/app/consulta-page'
 import { PacienteAgendamentosPage } from '@/features/paciente/agendamentos-page'
 import { PacientePlanoPage } from '@/features/paciente/plano-page'
 import { PacienteEvolucaoPage } from '@/features/paciente/evolucao-page'
+import { PacienteMarcarPage } from '@/features/paciente/marcar-page'
 import { NutriPublicPage } from '@/features/publico/nutri-public-page'
+import { MarketplacePage } from '@/features/marketplace/marketplace-page'
 import { AdminSaudePage } from '@/features/admin/saude-page'
 
 function ProtectedRoute() {
@@ -29,18 +31,40 @@ function ProtectedRoute() {
 function AuthRedirect() {
   const { session, initialized, profile } = useAuth()
   if (!initialized) return <Loading label="Carregando..." />
-  if (session) {
-    if (profile?.role === 'nutricionista') return <Navigate to="/app" replace />
-    if (profile?.role === 'admin') return <Navigate to="/admin/saude" replace />
+  // Quando temos sessão mas o profile ainda não chegou, esperamos — sem isso
+  // entramos em loop (redireciono pro papel fallback → RoleGate vê role ausente
+  // e redireciona de volta).
+  if (session && !profile) return <Loading label="Carregando perfil..." />
+  if (session && profile) {
+    if (profile.role === 'nutricionista') return <Navigate to="/app" replace />
+    if (profile.role === 'admin') return <Navigate to="/admin/saude" replace />
     return <Navigate to="/paciente/agendamentos" replace />
   }
   return <Outlet />
 }
 
-function RoleGate({ allow }: { allow: Array<'nutricionista' | 'paciente' | 'admin'> }) {
-  const { profile, initialized } = useAuth()
+/**
+ * Rota raiz: se o usuário está logado, manda para o dashboard do papel; se
+ * não, mostra a landing pública.
+ */
+function HomeRoute() {
+  const { session, initialized, profile } = useAuth()
   if (!initialized) return <Loading label="Carregando..." />
-  if (!profile) return <Navigate to="/login" replace />
+  if (session && !profile) return <Loading label="Carregando perfil..." />
+  if (session && profile) {
+    if (profile.role === 'nutricionista') return <Navigate to="/app" replace />
+    if (profile.role === 'admin') return <Navigate to="/admin/saude" replace />
+    return <Navigate to="/paciente/agendamentos" replace />
+  }
+  return <LandingPage />
+}
+
+function RoleGate({ allow }: { allow: Array<'nutricionista' | 'paciente' | 'admin'> }) {
+  const { session, profile, initialized } = useAuth()
+  if (!initialized) return <Loading label="Carregando..." />
+  if (!session) return <Navigate to="/login" replace />
+  // Sessão existe mas profile ainda não carregou — espera, NÃO redireciona.
+  if (!profile) return <Loading label="Carregando perfil..." />
   if (!allow.includes(profile.role)) {
     const fallback =
       profile.role === 'nutricionista'
@@ -113,8 +137,9 @@ function AuthShell() {
 }
 
 export const router = createBrowserRouter([
-  // Públicas
-  { path: '/', element: <LandingPage /> },
+  // Raiz: landing pública OU redireciona para o dashboard do papel se logado.
+  { path: '/', element: <HomeRoute /> },
+  { path: '/nutricionistas', element: <MarketplacePage /> },
   { path: '/nutri/:slug', element: <NutriPublicPage /> },
 
   // Auth (somente se NÃO logado)
@@ -148,7 +173,11 @@ export const router = createBrowserRouter([
               { path: '/app/planos', element: <PlanosPage /> },
               { path: '/app/planos/:id', element: <PlanoEditorPage /> },
               { path: '/app/consulta/:id', element: <ConsultaPage perspectiva="nutricionista" /> },
+              // Acesso direto a /app/consulta sem id → manda para agenda.
+              { path: '/app/consulta', element: <Navigate to="/app" replace /> },
               { path: '/app/perfil', element: <PerfilNutriPage /> },
+              // Catch-all do nutri → agenda.
+              { path: '/app/*', element: <Navigate to="/app" replace /> },
             ],
           },
         ],
@@ -162,9 +191,13 @@ export const router = createBrowserRouter([
             element: <PacienteShell />,
             children: [
               { path: '/paciente/agendamentos', element: <PacienteAgendamentosPage /> },
+              { path: '/paciente/marcar', element: <PacienteMarcarPage /> },
               { path: '/paciente/plano', element: <PacientePlanoPage /> },
               { path: '/paciente/evolucao', element: <PacienteEvolucaoPage /> },
               { path: '/paciente/consulta/:id', element: <ConsultaPage perspectiva="paciente" /> },
+              { path: '/paciente/consulta', element: <Navigate to="/paciente/agendamentos" replace /> },
+              // Catch-all do paciente → agendamentos.
+              { path: '/paciente/*', element: <Navigate to="/paciente/agendamentos" replace /> },
             ],
           },
         ],
