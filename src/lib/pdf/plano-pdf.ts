@@ -113,6 +113,26 @@ function fmtData(s: string): string {
   }
 }
 
+/**
+ * Sanitiza texto para o PDF: troca glyphs Unicode que Helvetica/Times built-in
+ * do jsPDF não suportam (→, ≥, ≤, —, …) por equivalentes ASCII. Sem isso o
+ * jsPDF aplica letter-spacing estranho ou renderiza como pontuação aleatória.
+ */
+function sanit(s: string | null | undefined): string {
+  if (!s) return ''
+  return s
+    .replace(/→/g, '->')
+    .replace(/←/g, '<-')
+    .replace(/≥/g, '>=')
+    .replace(/≤/g, '<=')
+    .replace(/—/g, '-')
+    .replace(/–/g, '-')
+    .replace(/…/g, '...')
+    .replace(/·/g, '•')
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+}
+
 // ─── Componente: marca (brand-mark + wordmark) ──────────────────────
 function desenharMarca(doc: jsPDF, x: number, y: number) {
   const size = 22
@@ -151,7 +171,7 @@ export function gerarPlanoPdf(args: GerarPlanoPdfArgs): jsPDF {
   doc.setFontSize(9)
   doc.setTextColor(COR.ink3)
   doc.text(
-    `Emitido em ${format(new Date(), "d 'de' MMM yyyy 'às' HH:mm", { locale: ptBR })}`,
+    sanit(`Emitido em ${format(new Date(), "d 'de' MMM yyyy 'as' HH:mm", { locale: ptBR })}`),
     PAGE_W - MARGIN_X,
     y + 14,
     { align: 'right' },
@@ -173,18 +193,18 @@ export function gerarPlanoPdf(args: GerarPlanoPdfArgs): jsPDF {
   doc.setFont('times', 'normal')
   doc.setFontSize(22)
   doc.setTextColor(COR.ink)
-  const tituloLinhas = doc.splitTextToSize(plano.titulo, CONTENT_W)
+  const tituloLinhas = doc.splitTextToSize(sanit(plano.titulo), CONTENT_W)
   doc.text(tituloLinhas, MARGIN_X, y)
-  y += tituloLinhas.length * 22
+  y += tituloLinhas.length * 22 + 4
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(10.5)
   doc.setTextColor(COR.ink2)
   const periodo = plano.data_fim
-    ? `${fmtData(plano.data_inicio)} → ${fmtData(plano.data_fim)}`
-    : `A partir de ${fmtData(plano.data_inicio)} — em vigor`
-  doc.text(periodo, MARGIN_X, y + 6)
-  y += 28
+    ? `${fmtData(plano.data_inicio)} a ${fmtData(plano.data_fim)}`
+    : `A partir de ${fmtData(plano.data_inicio)} - em vigor`
+  doc.text(sanit(periodo), MARGIN_X, y + 6)
+  y += 32
 
   // — Card duplo: nutricionista | paciente
   const colW = (CONTENT_W - 12) / 2
@@ -200,11 +220,11 @@ export function gerarPlanoPdf(args: GerarPlanoPdfArgs): jsPDF {
   doc.setFont('times', 'normal')
   doc.setFontSize(15)
   doc.setTextColor(COR.ink)
-  doc.text(nutri.nome, MARGIN_X + 12, y + 34, { maxWidth: colW - 24 })
+  doc.text(sanit(nutri.nome), MARGIN_X + 12, y + 34, { maxWidth: colW - 24 })
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
   doc.setTextColor(COR.ink2)
-  doc.text(`CRN ${nutri.crn}`, MARGIN_X + 12, y + 50)
+  doc.text(sanit(`CRN ${nutri.crn}`), MARGIN_X + 12, y + 50)
 
   // Paciente
   const xPac = MARGIN_X + colW + 12
@@ -217,7 +237,7 @@ export function gerarPlanoPdf(args: GerarPlanoPdfArgs): jsPDF {
   doc.setFont('times', 'normal')
   doc.setFontSize(15)
   doc.setTextColor(COR.ink)
-  doc.text(paciente.nome, xPac + 12, y + 34, { maxWidth: colW - 24 })
+  doc.text(sanit(paciente.nome), xPac + 12, y + 34, { maxWidth: colW - 24 })
 
   y += cardH + 22
 
@@ -242,20 +262,20 @@ export function gerarPlanoPdf(args: GerarPlanoPdfArgs): jsPDF {
     doc.setFont('times', 'normal')
     doc.setFontSize(14)
     doc.setTextColor(COR.ink)
-    doc.text(r.nome, MARGIN_X + 12, y + 20)
+    doc.text(sanit(r.nome), MARGIN_X + 12, y + 20)
 
     if (r.horario) {
       doc.setFont('courier', 'normal')
       doc.setFontSize(10)
       doc.setTextColor(COR.ink3)
-      doc.text(r.horario.slice(0, 5), MARGIN_X + 110, y + 20)
+      doc.text(r.horario.slice(0, 5), MARGIN_X + 130, y + 20)
     }
 
     // Macros à direita
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
     doc.setTextColor(COR.ink2)
-    const macroTxt = `${Math.round(m.kcal)} kcal · C ${m.c.toFixed(0)}g · P ${m.p.toFixed(0)}g · L ${m.l.toFixed(0)}g`
+    const macroTxt = `${Math.round(m.kcal)} kcal | C ${m.c.toFixed(0)}g  P ${m.p.toFixed(0)}g  L ${m.l.toFixed(0)}g`
     doc.text(macroTxt, PAGE_W - MARGIN_X - 10, y + 20, { align: 'right' })
 
     y += 38
@@ -268,8 +288,8 @@ export function gerarPlanoPdf(args: GerarPlanoPdfArgs): jsPDF {
         ? r.plano_itens.map((it) => {
             const im = macroDoItem(it)
             return [
-              it.alimentos?.nome ?? '—',
-              it.medida_caseira ?? '—',
+              sanit(it.alimentos?.nome ?? '-'),
+              sanit(it.medida_caseira ?? '-'),
               `${it.quantidade_g} g`,
               Math.round(im.kcal).toString(),
               im.c.toFixed(0),
@@ -314,60 +334,97 @@ export function gerarPlanoPdf(args: GerarPlanoPdfArgs): jsPDF {
   }
 
   // — Totais do dia
-  if (y > 700) {
+  // Altura aumentada (88pt) com layout em 3 linhas dentro de cada coluna:
+  // valor (serif grande) / label minúsculo / meta minúsculo
+  if (y > 690) {
     doc.addPage()
     y = 40
   }
   const total = macroDoPlano(refeicoes)
+  const TOTAL_CARD_H = 90
   doc.setFillColor(COR.accent)
-  doc.roundedRect(MARGIN_X, y, CONTENT_W, 58, 6, 6, 'F')
+  doc.roundedRect(MARGIN_X, y, CONTENT_W, TOTAL_CARD_H, 6, 6, 'F')
 
-  doc.setFont('helvetica', 'normal')
+  doc.setFont('helvetica', 'bold')
   doc.setFontSize(8.5)
   doc.setTextColor('#cfe8d9')
   doc.text('TOTAL DO DIA', MARGIN_X + 16, y + 18)
 
-  const cellW = (CONTENT_W - 32) / 5
-  const startX = MARGIN_X + 16
-  const items: Array<[string, string, string]> = [
-    [`${Math.round(total.kcal)}`, 'kcal', `de ${metas.kcal}`],
-    [`${total.c.toFixed(0)}g`, 'carboidrato', `de ${metas.carb}g`],
-    [`${total.p.toFixed(0)}g`, 'proteína', `de ${metas.prot}g`],
-    [`${total.l.toFixed(0)}g`, 'lipídio', `de ${metas.lip}g`],
-    [`${total.fib.toFixed(1)}g`, 'fibra', '≥ 25g'],
+  // 5 colunas igualmente espaçadas com padding interno
+  const PAD_LEFT = 16
+  const cellW = (CONTENT_W - PAD_LEFT * 2) / 5
+  const startX = MARGIN_X + PAD_LEFT
+
+  interface Cell {
+    value: string
+    unit: string
+    label: string
+    meta: string
+  }
+  const cells: Cell[] = [
+    { value: `${Math.round(total.kcal)}`, unit: 'kcal', label: 'Energia', meta: `meta ${metas.kcal}` },
+    { value: `${total.c.toFixed(0)}`, unit: 'g', label: 'Carboidrato', meta: `meta ${metas.carb}g` },
+    { value: `${total.p.toFixed(0)}`, unit: 'g', label: 'Proteina', meta: `meta ${metas.prot}g` },
+    { value: `${total.l.toFixed(0)}`, unit: 'g', label: 'Lipidio', meta: `meta ${metas.lip}g` },
+    { value: `${total.fib.toFixed(1)}`, unit: 'g', label: 'Fibra', meta: 'recom. >= 25g' },
   ]
-  items.forEach(([val, label, meta], i) => {
+
+  cells.forEach((c, i) => {
     const cx = startX + i * cellW
+    // Valor + unidade (serif grande)
     doc.setFont('times', 'normal')
-    doc.setFontSize(18)
+    doc.setFontSize(22)
     doc.setTextColor('#ffffff')
-    doc.text(val, cx, y + 38)
+    doc.text(c.value, cx, y + 50)
+
+    // Unidade discreta à direita do valor
+    const valW = doc.getTextWidth(c.value)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    doc.setTextColor('#cfe8d9')
+    doc.text(c.unit, cx + valW + 3, y + 50)
+
+    // Label
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8.5)
-    doc.setTextColor('#cfe8d9')
-    doc.text(label, cx, y + 50)
-    doc.text(meta, cx + cellW - 18, y + 18, { align: 'right' })
+    doc.setTextColor('#a8d5b9')
+    doc.text(c.label, cx, y + 65)
+
+    // Meta abaixo
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.5)
+    doc.setTextColor('#8fc6a5')
+    doc.text(c.meta, cx, y + 78)
   })
 
-  y += 78
+  y += TOTAL_CARD_H + 18
 
   // — Observações
   if (plano.observacoes) {
-    if (y > 740) {
+    const obsLimpa = sanit(plano.observacoes)
+    if (y > 730) {
       doc.addPage()
       y = 40
     }
-    doc.setFont('helvetica', 'normal')
+    // Card warm com padding interno
+    doc.setFont('helvetica', 'bold')
     doc.setFontSize(8)
     doc.setTextColor(COR.ink3)
-    doc.text('OBSERVAÇÕES DA NUTRICIONISTA', MARGIN_X, y)
+    doc.text('OBSERVACOES DA NUTRICIONISTA', MARGIN_X, y)
     y += 14
+
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(10.5)
     doc.setTextColor(COR.ink2)
-    const obsLinhas = doc.splitTextToSize(plano.observacoes, CONTENT_W)
-    doc.text(obsLinhas, MARGIN_X, y)
-    y += obsLinhas.length * 14 + 10
+    const obsLinhas = doc.splitTextToSize(obsLimpa, CONTENT_W - 20)
+
+    // Fundo suave para destacar
+    const obsH = obsLinhas.length * 14 + 20
+    doc.setFillColor(COR.paper2)
+    doc.roundedRect(MARGIN_X, y - 6, CONTENT_W, obsH, 6, 6, 'F')
+    doc.setTextColor(COR.ink2)
+    doc.text(obsLinhas, MARGIN_X + 14, y + 8)
+    y += obsH + 8
   }
 
   // — Rodapé em todas as páginas
@@ -384,7 +441,9 @@ export function gerarPlanoPdf(args: GerarPlanoPdfArgs): jsPDF {
     doc.setTextColor(COR.ink4)
     doc.setFontSize(7.5)
     doc.text(
-      'Este documento é informativo e não substitui orientação clínica individual presencial.',
+      sanit(
+        'Este documento e informativo e nao substitui orientacao clinica individual presencial.',
+      ),
       PAGE_W / 2,
       834,
       { align: 'center' },
